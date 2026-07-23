@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Alya Assistente</title>
+  <link rel="stylesheet" href="aly.css" />
+  <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
+</head>
+<body>
+  <aside id="sidebar" class="sidebar" aria-label="Menu lateral">
+    <div class="sidebar-header">
+      <div class="sidebar-brand">
+        <span class="brand-mark" aria-hidden="true">A</span>
+        <div>
+          <p class="eyebrow">Assistente pessoal</p>
+          <h1>Alya Assistente</h1>
+        </div>
+      </div>
+      <button id="newConversationButton" class="new-conversation-btn" type="button" title="Nova conversa">
+        <span aria-hidden="true">+</span> Nova conversa
+      </button>
+      <div class="search-box">
+        <input id="searchConversationsInput" type="text" placeholder="Buscar conversas..." />
+      </div>
+    </div>
+    <div class="sidebar-body">
+      <div id="conversationsListSidebar" class="conversations-list"></div>
+    </div>
+    <div class="sidebar-footer">
+      <button id="themeButton" class="sidebar-footer-btn" type="button" title="Alternar tema" aria-label="Alternar tema">
+        <span class="sidebar-icon" aria-hidden="true">&#9728;</span>
+        <span>Tema</span>
+      </button>
+      <button id="settingsButton" class="sidebar-footer-btn" type="button" title="Configuracoes" aria-label="Configuracoes">
+        <span class="sidebar-icon" aria-hidden="true">&#9881;</span>
+        <span>Configuracoes</span>
+      </button>
+      <button id="helpButton" class="sidebar-footer-btn" type="button" title="Ajuda" aria-label="Ajuda">
+        <span class="sidebar-icon" aria-hidden="true">&#63;</span>
+        <span>Ajuda</span>
+      </button>
+    </div>
+  </aside>
+
+  <section class="main-panel" aria-label="Area principal">
+    <section class="chat-area">
+      <section class="welcome" id="welcomeScreen" hidden>
+        <div class="welcome-inner">
+          <span class="brand-mark" aria-hidden="true">A</span>
+          <h2 class="welcome-title">Ola! Como posso ajudar hoje?</h2>
+          <p class="welcome-subtitle">Comece a conversar livremente.</p>
+          <div class="welcome-cards">
+            <button class="welcome-card" data-prompt="Criar um texto sobre">Criar texto</button>
+            <button class="welcome-card" data-prompt="Explicar o conceito de">Explicar conceitos</button>
+            <button class="welcome-card" data-prompt="Gerar um exemplo de codigo para">Gerar codigo</button>
+            <button class="welcome-card" data-prompt="Traduzir para">Traduzir</button>
+          </div>
+        </div>
+      </section>
+
+      <div id="messages" class="messages" aria-live="polite"></div>
+      <div id="typingIndicator" class="typing-indicator" hidden aria-hidden="true">
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+      </div>
+    </section>
+
+    <section class="composer-section">
+      <form id="chatForm" class="composer">
+        <label class="sr-only" for="messageInput">Mensagem</label>
+        <textarea id="messageInput" name="message" rows="1" placeholder="Converse com a Alya..." required></textarea>
+        <button id="sendButton" class="send-btn" type="submit" title="Enviar mensagem" aria-label="Enviar mensagem">
+          <span aria-hidden="true">&#10142;</span>
+        </button>
+      </form>
+    </section>
+  </section>
+
+  <section id="settingsModal" class="memory-modal" aria-label="Configuracoes" hidden>
+    <div class="memory-card">
+      <header class="memory-header">
+        <h2>Configuracoes</h2>
+        <button id="closeSettingsButton" class="icon-button" type="button" title="Fechar configuracoes" aria-label="Fechar configuracoes">
+          <span aria-hidden="true">&#215;</span>
+        </button>
+      </header>
+      <div class="settings-content">
+        <section id="settingsGeneral" class="settings-tab" data-tab="general">
+          <h3>Geral</h3>
+          <label class="setting-item" for="settingsLanguage">
+            <span>Idioma</span>
+            <select id="settingsLanguage" class="setting-select">
+              <option value="pt-BR">Portugues</option>
+              <option value="en">English</option>
+              <option value="es">Espanol</option>
+            </select>
+          </label>
+          <label class="setting-item" for="settingsAiName">
+            <span>Nome da IA</span>
+            <input id="settingsAiName" type="text" value="Alya" />
+          </label>
+          <label class="setting-item" for="settingsUserName">
+            <span>Nome do usuario</span>
+            <input id="settingsUserName" type="text" value="Pedro" />
+          </label>
+          <label class="setting-item" for="settingsWelcomeToggle">
+            <span>Tela de boas-vindas</span>
+            <input id="settingsWelcomeToggle" type="checkbox" checked />
+          </label>
+          <label class="setting-item" for="settingsSoundToggle">
+            <span>Som de inicializacao</span>
+            <input id="settingsSoundToggle" type="checkbox" checked />
+          </label>
+        </section>
+
+        <section id="settingsChat" class="settings-tab" data-tab="chat" hidden>
+          <h3>Chat</h3>
+          <label class="setting-item" for="personalitySelect">
+            <span>Personalidade</span>
+            <select id="personalitySelect" class="setting-select">
+              <option value="equilibrada">Equilibrada</option>
+              <option value="direta" selected>Direta</option>
+              <option value="amiga">Amiga</option>
+              <option value="tecnica">Tecnica</option>
+              <option value="jarvis">Jarvis</option>
+            </select>
+          </label>
+          <label class="setting-item" for="modeSelect">
+            <span>Modo</span>
+            <select id="modeSelect" class="setting-select">
+              <option value="normal" selected>Normal</option>
+              <option value="estudo">Estudo</option>
+              <option value="criativo">Criativo</option>
+              <option value="codigo">Codigo</option>
+              <option value="rapido">Rapido</option>
+            </select>
+          </label>
+          <label class="setting-item" for="memoryInput">
+            <span>Memoria</span>
+            <textarea id="memoryInput" rows="4" placeholder="Ex: Responda de forma simples. Gosto de tecnologia."></textarea>
+          </label>
+        </section>
+      </div>
+      <div class="memory-actions">
+        <button id="saveSettingsButton" class="tool-button primary" type="button">Salvar</button>
+      </div>
+    </div>
+  </section>
+
+  <script src="aly.js"></script>
+</body>
+</html>

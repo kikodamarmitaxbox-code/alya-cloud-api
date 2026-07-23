@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Astra - Assistente IA</title>
+    <meta name="description" content="Astra - Assistente IA leve usando APIs gratuitas. Converse, estude, organize ideias e ajudas no dia a dia." />
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  </head>
+  <body>
+    <div id="welcomeSplash" class="welcome-splash" hidden>
+      <div class="welcome-splash-inner">
+        <span class="splash-logo" aria-hidden="true">A</span>
+        <h2 class="splash-title">Bem-vindo, Pedro!</h2>
+        <p class="splash-subtitle">Iniciando Astra...</p>
+      </div>
+    </div>
+
+    <section id="accessGate" class="access-gate" hidden>
+      <div class="access-panel">
+        <div class="access-brand">
+          <span class="brand-mark" aria-hidden="true">A</span>
+          <div>
+            <p class="eyebrow">Assistente pessoal</p>
+            <h1>Astra</h1>
+          </div>
+        </div>
+        <p class="access-copy">Uma IA criada para conversar, estudar, organizar ideias e ajudar em tarefas do dia a dia.</p>
+        <div class="access-highlights" aria-label="Recursos da Astra">
+          <span>Estudo</span>
+          <span>Ideias</span>
+          <span>Codigo</span>
+          <span>Organizacao</span>
+        </div>
+        <form id="accessForm" class="access-form" autocomplete="off">
+          <div id="usernameField" class="access-field" hidden>
+            <label for="accessUsername">Usuario</label>
+            <input id="accessUsername" type="text" autocomplete="username" placeholder="Digite seu usuario" />
+          </div>
+          <label for="accessPassword">Senha de acesso</label>
+          <div class="access-row">
+            <input id="accessPassword" type="password" autocomplete="current-password" placeholder="Digite a senha" />
+            <button id="accessSubmit" type="submit">Entrar</button>
+          </div>
+          <p id="accessError" class="access-error" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
+    <main id="appShell" class="app-shell" hidden>
+      <aside id="sidebar" class="sidebar" aria-label="Menu lateral">
+        <div class="sidebar-header">
+          <div class="sidebar-brand">
+            <span class="brand-mark" aria-hidden="true">A</span>
+            <div>
+              <p class="eyebrow">Assistente pessoal</p>
+              <h1>Astra</h1>
+            </div>
+          </div>
+          <button id="newConversationButton" class="new-conversation-btn" type="button" title="Nova conversa">
+            <span aria-hidden="true">+</span> Nova conversa
+          </button>
+          <div class="search-box">
+            <input id="searchConversationsInput" type="text" placeholder="Buscar conversas..." />
+          </div>
+        </div>
+        <div class="sidebar-body">
+          <div id="conversationsListSidebar" class="conversations-list"></div>
+        </div>
+        <div class="sidebar-footer">
+          <button id="themeButton" class="sidebar-footer-btn" type="button" title="Alternar tema" aria-label="Alternar tema">
+            <span class="sidebar-icon" aria-hidden="true">&#9728;</span>
+            <span>Tema</span>
+          </button>
+          <button id="settingsButton" class="sidebar-footer-btn" type="button" title="Configuracoes" aria-label="Configuracoes">
+            <span class="sidebar-icon" aria-hidden="true">&#9881;</span>
+            <span>Configuracoes</span>
+          </button>
+          <button id="helpButton" class="sidebar-footer-btn" type="button" title="Ajuda" aria-label="Ajuda">
+            <span class="sidebar-icon" aria-hidden="true">&#63;</span>
+            <span>Ajuda</span>
+          </button>
+        </div>
+      </aside>
+
+      <section class="main-panel" aria-label="Area principal">
+        <header class="main-header">
+          <div class="header-groups">
+            <div class="header-group">
+              <label class="sr-only" for="personalitySelect">Personalidade</label>
+              <select id="personalitySelect" class="icon-btn personality-select" title="Personalidade">
+                <option value="equilibrada">Equilibrada</option>
+                <option value="direta">Direta</option>
+                <option value="amiga">Amiga</option>
+                <option value="tecnica">Tecnica</option>
+                <option value="jarvis">Jarvis</option>
+              </select>
+              <button id="memoryButton" class="icon-btn" type="button" title="Memoria">Memoria</button>
+              <button id="devModeButton" class="icon-btn" type="button" title="Modo Dev">Dev</button>
+              <button id="devHistoryButton" class="icon-btn" type="button" title="Historico Dev">Historico</button>
+            </div>
+            <div class="header-divider" aria-hidden="true"></div>
+            <div class="header-group">
+              <button id="whatsappButton" class="icon-btn" type="button" title="WhatsApp">WhatsApp</button>
+              <button id="discordButton" class="icon-btn" type="button" title="Discord">Discord</button>
+            </div>
+          </div>
+          <div class="header-actions">
+            <span id="apiStatus" class="status-pill" aria-label="Status da API">verificando...</span>
+            <button id="exportButton" class="icon-btn" type="button" title="Exportar conversa" aria-label="Exportar conversa">
+              <span aria-hidden="true">&#8681;</span>
+            </button>
+            <button id="clearButton" class="icon-btn" type="button" title="Limpar conversa" aria-label="Limpar conversa">
+              <span aria-hidden="true">&#8635;</span>
+            </button>
+          </div>
+        </header>
+
+        <section class="mode-strip" aria-label="Modos da Astra">
+          <button class="mode-button" type="button" data-mode="normal">Normal</button>
+          <button class="mode-button" type="button" data-mode="estudo">Estudo</button>
+          <button class="mode-button" type="button" data-mode="criativo">Criativo</button>
+          <button class="mode-button" type="button" data-mode="codigo">Codigo</button>
+          <button class="mode-button" type="button" data-mode="rapido">Rapido</button>
+          <button id="searchButton" class="mode-button" type="button" title="Buscar">Buscar</button>
+        </section>
+
+        <section class="chat-area">
+          <section class="welcome" id="welcomeScreen" hidden>
+            <div class="welcome-inner">
+              <span class="brand-mark" aria-hidden="true">A</span>
+              <h2 class="welcome-title">Olá! Como posso ajudar hoje?</h2>
+              <p class="welcome-subtitle">Escolha um tema ou comece a conversar livremente.</p>
+              <div class="welcome-cards">
+                <button class="welcome-card" data-prompt="Criar um texto sobre">Criar texto</button>
+                <button class="welcome-card" data-prompt="Explicar o conceito de">Explicar conceitos</button>
+                <button class="welcome-card" data-prompt="Gerar um exemplo de codigo para">Gerar codigo</button>
+                <button class="welcome-card" data-prompt="Analisar o arquivo">Analisar arquivos</button>
+                <button class="welcome-card" data-prompt="Pesquisar sobre">Pesquisar</button>
+                <button class="welcome-card" data-prompt="Traduzir para">Traduzir</button>
+              </div>
+            </div>
+          </section>
+
+          <div id="messages" class="messages" aria-live="polite"></div>
+          <div id="typingIndicator" class="typing-indicator" hidden aria-hidden="true">
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+          </div>
+        </section>
+
+        <section class="composer-section">
+          <form id="chatForm" class="composer">
+            <label class="sr-only" for="messageInput">Mensagem</label>
+            <textarea id="messageInput" name="message" rows="1" placeholder="Pergunte alguma coisa para a Astra..." required></textarea>
+            <button id="sendButton" class="send-btn" type="submit" title="Enviar mensagem" aria-label="Enviar mensagem">
+              <span aria-hidden="true">&#10142;</span>
+            </button>
+          </form>
+        </section>
+      </section>
+    </main>
+
+    <section id="whatsappPanel" class="side-panel" aria-label="Aprovacao de mensagens do WhatsApp" hidden>
+      <header class="side-panel-header">
+        <h2>WhatsApp</h2>
+        <button id="closeWhatsappButton" class="icon-button" type="button" title="Fechar" aria-label="Fechar">
+          <span aria-hidden="true">&#215;</span>
+        </button>
+      </header>
+      <div id="whatsappQueue" class="side-panel-body"></div>
+      <div class="side-panel-footer">
+        <button id="refreshWhatsappButton" class="tool-button" type="button">Atualizar</button>
+        <button id="viewWhatsappLogButton" class="tool-button" type="button">Ver Log</button>
+      </div>
+    </section>
+
+    <section id="discordPanel" class="side-panel" aria-label="Aprovacao de mensagens do Discord" hidden>
+      <header class="side-panel-header">
+        <h2>Discord</h2>
+        <button id="closeDiscordButton" class="icon-button" type="button" title="Fechar" aria-label="Fechar">
+          <span aria-hidden="true">&#215;</span>
+        </button>
+      </header>
+      <div id="discordQueue" class="side-panel-body"></div>
+      <div class="side-panel-footer">
+        <button id="refreshDiscordButton" class="tool-button" type="button">Atualizar</button>
+        <button id="viewDiscordLogButton" class="tool-button" type="button">Ver Log</button>
+      </div>
+    </section>
+
+    <section id="searchPanel" class="memory-modal" aria-label="Buscar no historico" hidden>
+      <div class="memory-card">
+        <header class="memory-header">
+          <h2>Buscar no historico</h2>
+          <button id="closeSearchButton" class="icon-button" type="button" title="Fechar busca" aria-label="Fechar busca">
+            <span aria-hidden="true">&#215;</span>
+          </button>
+        </header>
+        <label class="sr-only" for="searchInput">Buscar</label>
+        <input id="searchInput" type="text" placeholder="Digite para buscar..." />
+        <div id="searchResults" class="search-results"></div>
+      </div>
+    </section>
+
+    <section id="conversationsPanel" class="memory-modal" aria-label="Conversas" hidden>
+      <div class="memory-card">
+        <header class="memory-header">
+          <h2>Conversas</h2>
+          <button id="closeConversationsButton" class="icon-button" type="button" title="Fechar conversas" aria-label="Fechar conversas">
+            <span aria-hidden="true">&#215;</span>
+          </button>
+        </header>
+        <div id="conversationsListModal" class="conversations-list"></div>
+      </div>
+    </section>
+
+    <section id="devApprovalModal" class="memory-modal" aria-label="Aprovacao Dev" hidden>
+      <div class="memory-card dev-approval-card">
+        <header class="memory-header">
+          <h2>Acao Dev Requer Aprovacao</h2>
+          <button id="closeDevApprovalButton" class="icon-button" type="button" title="Fechar" aria-label="Fechar">
+            <span aria-hidden="true">&#215;</span>
+          </button>
+        </header>
+        <div id="devApprovalContent" class="dev-approval-content"></div>
+        <div class="dev-approval-actions">
+          <button id="approveDevAction" class="tool-button" type="button">Aprovar</button>
+          <button id="rejectDevAction" class="tool-button" type="button">Rejeitar</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="devHistoryPanel" class="memory-modal" aria-label="Historico Dev" hidden>
+      <div class="memory-card">
+        <header class="memory-header">
+          <h2>Historico de Acoes Dev</h2>
+          <button id="closeDevHistoryButton" class="icon-button" type="button" title="Fechar historico" aria-label="Fechar historico">
+            <span aria-hidden="true">&#215;</span>
+          </button>
+        </header>
+        <div id="devHistoryList" class="dev-history-list"></div>
+      </div>
+    </section>
+
+    <section id="memoryModal" class="memory-modal" aria-label="Memoria da Astra" hidden>
+      <div class="memory-card">
+        <header class="memory-header">
+          <h2>Memoria</h2>
+          <button id="closeMemoryButton" class="icon-button" type="button" title="Fechar memoria" aria-label="Fechar memoria">
+            <span aria-hidden="true">&#215;</span>
+          </button>
+        </header>
+        <label class="sr-only" for="memoryInput">Memoria</label>
+        <textarea id="memoryInput" rows="7" placeholder="Ex: Meu nome e Pedro. Gosto de respostas simples. Estou criando uma assistente IA."></textarea>
+        <div class="memory-actions">
+          <button id="saveMemoryButton" class="tool-button primary" type="button">Salvar</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="settingsModal" class="memory-modal" aria-label="Configuracoes" hidden>
+      <div class="settings-card">
+        <header class="memory-header">
+          <h2>Configuracoes</h2>
+          <button id="closeSettingsButton" class="icon-button" type="button" title="Fechar configuracoes" aria-label="Fechar configuracoes">
+            <span aria-hidden="true">&#215;</span>
+          </button>
+        </header>
+
+        <div class="settings-body">
+          <nav class="settings-nav">
+            <button class="settings-nav-item active" data-settings-tab="general" type="button">Geral</button>
+          </nav>
+
+          <div class="settings-content">
+            <section id="settingsGeneral" class="settings-tab" data-tab="general">
+              <h3>Geral</h3>
+
+              <label class="setting-item" for="settingsLanguage">
+                <span>Idioma</span>
+                <select id="settingsLanguage" class="setting-select">
+                  <option value="pt-BR">Portugues</option>
+                  <option value="en">English</option>
+                  <option value="es">Espanol</option>
+                </select>
+              </label>
+
+              <label class="setting-item" for="settingsAiName">
+                <span>Nome da IA</span>
+                <input id="settingsAiName" type="text" value="Astra" />
+              </label>
+
+              <label class="setting-item" for="settingsUserName">
+                <span>Nome do usuario</span>
+                <input id="settingsUserName" type="text" value="Pedro" />
+              </label>
+
+              <label class="setting-item" for="settingsWelcomeToggle">
+                <span>Tela de boas-vindas</span>
+                <input id="settingsWelcomeToggle" type="checkbox" checked />
+              </label>
+
+              <label class="setting-item" for="settingsSoundToggle">
+                <span>Som de inicializacao</span>
+                <input id="settingsSoundToggle" type="checkbox" checked />
+              </label>
+            </section>
+          </div>
+        </div>
+
+        <div class="memory-actions">
+          <button id="saveSettingsButton" class="tool-button primary" type="button">Salvar</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="fileApprovalModal" class="memory-modal" aria-label="Aprovar alteracao de arquivo" hidden>
+      <div class="memory-card">
+        <header class="memory-header">
+          <h2>Aprovar arquivo</h2>
+          <button id="cancelFileEditButton" class="icon-button" type="button" title="Cancelar alteracao" aria-label="Cancelar alteracao">
+            <span aria-hidden="true">&#215;</span>
+          </button>
+        </header>
+        <p class="approval-copy">A Astra quer alterar apenas o arquivo seguro dela:</p>
+        <code class="file-path">nova-data/profile.json</code>
+        <pre id="filePreview" class="file-preview"></pre>
+        <div class="memory-actions">
+          <button id="applyFileEditButton" class="tool-button primary" type="button">Aplicar com backup</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="whatsappLogModal" class="memory-modal" aria-label="Log do WhatsApp" hidden>
+      <div class="memory-card">
+        <header class="memory-header">
+          <h2>Log de Aprovacoes</h2>
+          <button id="closeWhatsappLogButton" class="icon-button" type="button" title="Fechar log" aria-label="Fechar log">
+            <span aria-hidden="true">&#215;</span>
+          </button>
+        </header>
+        <pre id="whatsappLogContent" class="file-preview"></pre>
+      </div>
+    </section>
+
+    <section id="discordLogModal" class="memory-modal" aria-label="Log do Discord" hidden>
+      <div class="memory-card">
+        <header class="memory-header">
+          <h2>Log de Aprovacoes - Discord</h2>
+          <button id="closeDiscordLogButton" class="icon-button" type="button" title="Fechar log" aria-label="Fechar log">
+            <span aria-hidden="true">&#215;</span>
+          </button>
+        </header>
+        <pre id="discordLogContent" class="file-preview"></pre>
+      </div>
+    </section>
+
+    <section id="settingsModal" class="memory-modal" aria-label="Configuracoes" hidden>
+      <div class="settings-card">
+        <header class="memory-header">
+          <h2>Configuracoes</h2>
+          <button id="closeSettingsButton" class="icon-button" type="button" title="Fechar configuracoes" aria-label="Fechar configuracoes">
+            <span aria-hidden="true">&#215;</span>
+          </button>
+        </header>
+
+        <div class="settings-body">
+          <nav class="settings-nav">
+            <button class="settings-nav-item active" data-settings-tab="general" type="button">Geral</button>
+          </nav>
+
+          <div class="settings-content">
+            <section id="settingsGeneral" class="settings-tab" data-tab="general">
+              <h3>Geral</h3>
+
+              <label class="setting-item" for="settingsLanguage">
+                <span>Idioma</span>
+                <select id="settingsLanguage" class="setting-select">
+                  <option value="pt-BR">Portugues</option>
+                  <option value="en">English</option>
+                  <option value="es">Espanol</option>
+                </select>
+              </label>
+
+              <label class="setting-item" for="settingsAiName">
+                <span>Nome da IA</span>
+                <input id="settingsAiName" type="text" value="Astra" />
+              </label>
+
+              <label class="setting-item" for="settingsUserName">
+                <span>Nome do usuario</span>
+                <input id="settingsUserName" type="text" value="Pedro" />
+              </label>
+
+              <label class="setting-item" for="settingsWelcomeToggle">
+                <span>Tela de boas-vindas</span>
+                <input id="settingsWelcomeToggle" type="checkbox" checked />
+              </label>
+
+              <label class="setting-item" for="settingsSoundToggle">
+                <span>Som de inicializacao</span>
+                <input id="settingsSoundToggle" type="checkbox" checked />
+              </label>
+            </section>
+          </div>
+        </div>
+
+        <div class="memory-actions">
+          <button id="saveSettingsButton" class="tool-button primary" type="button">Salvar</button>
+        </div>
+      </div>
+    </section>
+
+    <script src="app.js"></script>
+  </body>
+</html>
