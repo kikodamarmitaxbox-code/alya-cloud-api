@@ -232,6 +232,17 @@
       <div id="systemOverview" class="system-overview">
         <div class="system-loading">Verificando o sistema...</div>
       </div>
+      <div class="system-model-control">
+        <div>
+          <strong>Modelo principal</strong>
+          <small>Se ele cair, a Alya ainda tenta os modelos de reserva.</small>
+        </div>
+        <div class="system-model-actions">
+          <select id="systemModelSelect" aria-label="Escolher modelo principal"></select>
+          <button id="saveSystemModelButton" class="tool-button primary" type="button">Usar modelo</button>
+        </div>
+        <p id="systemModelStatus" class="system-model-status" aria-live="polite"></p>
+      </div>
       <div class="system-section">
         <div class="system-section-title"><strong>Modelos de IA</strong><button id="refreshSystemButton" class="tool-button" type="button">Atualizar</button></div>
         <div id="systemProviders" class="system-provider-list"></div>

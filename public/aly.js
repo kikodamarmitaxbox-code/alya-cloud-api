@@ -76,6 +76,9 @@ const closeSystemButton = document.querySelector('#closeSystemButton');
 const refreshSystemButton = document.querySelector('#refreshSystemButton');
 const systemOverview = document.querySelector('#systemOverview');
 const systemProviders = document.querySelector('#systemProviders');
+const systemModelSelect = document.querySelector('#systemModelSelect');
+const saveSystemModelButton = document.querySelector('#saveSystemModelButton');
+const systemModelStatus = document.querySelector('#systemModelStatus');
 const installAppButton = document.querySelector('#installAppButton');
 const authModal = document.querySelector('#authModal');
 const authForm = document.querySelector('#authForm');
@@ -87,6 +90,7 @@ const authStatus = document.querySelector('#authStatus');
 
 const storageKey = 'nova-chat-history';
 const settingsKey = 'nova-settings';
+const preferredProviderKey = 'alya-preferred-provider';
 const appSettingsKey = 'nova-app-settings';
 const usernameKey = 'nova-username';
 const conversationsKey = 'nova-conversations';
@@ -217,6 +221,20 @@ async function loadSystemDashboard() {
       <article class="system-stat ${data.discord.ready ? 'good' : ''}"><span>Discord</span><strong>${data.discord.ready ? 'Online' : data.discord.enabled ? 'Conectando' : 'Desativado'}</strong><small>situação do bot</small></article>
     `;
 
+    systemModelSelect.replaceChildren();
+    const configuredProviders = (data.providers.providers || []).filter((provider) => provider.configured);
+    for (const provider of configuredProviders) {
+      const option = document.createElement('option');
+      option.value = provider.name;
+      option.textContent = providerLabels[provider.name] || provider.name;
+      systemModelSelect.appendChild(option);
+    }
+    systemModelSelect.value = data.providers.preferred;
+    saveSystemModelButton.disabled = configuredProviders.length === 0;
+    systemModelStatus.textContent = configuredProviders.length
+      ? 'Escolha um modelo e confirme.'
+      : 'Nenhum outro modelo está configurado no momento.';
+
     for (const provider of data.providers.providers || []) {
       const row = document.createElement('div');
       row.className = `system-provider ${provider.configured ? (provider.ok === false ? 'down' : 'ready') : 'off'}`;
@@ -227,6 +245,50 @@ async function loadSystemDashboard() {
   } catch (error) {
     systemOverview.innerHTML = `<div class="system-loading">${escapeHtml(error.message || 'Não consegui carregar o painel.')}</div>`;
   }
+}
+
+async function saveSystemModel() {
+  const provider = systemModelSelect?.value;
+  if (!provider) return;
+  saveSystemModelButton.disabled = true;
+  systemModelStatus.textContent = 'Alterando o modelo...';
+  try {
+    const response = await fetch(`${apiBase}/api/system/model`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      showAuthModal('Entre novamente para mudar o modelo.');
+      throw new Error('Sua sessão terminou.');
+    }
+    if (!response.ok || !data.ok) throw new Error(data.error || 'Não consegui mudar o modelo.');
+    localStorage.setItem(preferredProviderKey, provider);
+    systemModelStatus.textContent = `${providerLabels[provider] || provider} selecionado. Reabrindo a Alya...`;
+    setTimeout(() => window.location.reload(), 650);
+  } catch (error) {
+    systemModelStatus.textContent = error.message || 'Não consegui mudar o modelo.';
+    saveSystemModelButton.disabled = false;
+  }
+}
+
+async function syncSavedProviderPreference() {
+  const provider = localStorage.getItem(preferredProviderKey);
+  if (!provider) return;
+  try {
+    const statusResponse = await fetch(`${apiBase}/api/ai-status`, { cache: 'no-store' });
+    const status = await statusResponse.json();
+    const available = (status.providers || []).some((item) => item.name === provider && item.configured);
+    if (!available || status.preferred === provider) return;
+    await fetch(`${apiBase}/api/system/model`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider })
+    });
+  } catch {}
 }
 
 function openSystemDashboard() {
@@ -1168,6 +1230,7 @@ authForm?.addEventListener('submit', submitAuthentication);
 systemButton?.addEventListener('click', openSystemDashboard);
 closeSystemButton?.addEventListener('click', () => { systemModal.hidden = true; });
 refreshSystemButton?.addEventListener('click', loadSystemDashboard);
+saveSystemModelButton?.addEventListener('click', saveSystemModel);
 systemModal?.addEventListener('click', (event) => {
   if (event.target === systemModal) systemModal.hidden = true;
 });
@@ -1370,7 +1433,8 @@ function init() {
 
   setTimeout(async () => {
     try {
-      await checkAuthentication();
+      const authenticated = await checkAuthentication();
+      if (authenticated) await syncSavedProviderPreference();
       render();
       renderSidebarConversations();
       updateConversationHeading();

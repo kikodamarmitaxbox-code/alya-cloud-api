@@ -6,7 +6,7 @@ const { spawn } = require('child_process');
 
 const logger = require('./lib/logger');
 const { isAuthenticated, hasSitePassword, validateLogin, setAuthCookie, clearAuthCookie, readSiteUsers, getAuthenticatedUsername } = require('./lib/auth');
-const { askAssistant, askAssistantStream, normalizeSettings, getProviderStatus } = require('./lib/chat');
+const { askAssistant, askAssistantStream, normalizeSettings, getProviderStatus, setPreferredProvider } = require('./lib/chat');
 const { handleWhatsappReceive, handleWhatsappApprove, handleWhatsappCancel, getWhatsappQueue, readWhatsappLog } = require('./lib/whatsapp');
 const { DiscordManager } = require('./lib/discord');
 const FileStorage = require('./lib/storage/FileStorage');
@@ -444,6 +444,23 @@ const server = http.createServer(async (req, res) => {
           environment: process.env.RENDER ? 'Render' : 'Local',
           version: '2.1.0'
         }
+      });
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/system/model') {
+      if (!apiLimiter.check(req, res)) return;
+      if (!requireAuth(req, res)) return;
+      const body = await readJsonBody(req);
+      const result = setPreferredProvider(body.provider);
+      if (!result.ok) {
+        sendJson(res, 400, { error: result.error });
+        return;
+      }
+      sendJson(res, 200, {
+        ok: true,
+        provider: result.provider,
+        message: 'Modelo principal alterado.'
       });
       return;
     }
