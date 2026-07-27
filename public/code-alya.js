@@ -5,7 +5,8 @@ const state = {
   openFiles: new Map(),
   activePath: '',
   busy: false,
-  terminalOpen: true
+  terminalOpen: true,
+  chatHistory: [{ role: 'assistant', content: 'Oi, Pedro! Me conta o que você quer criar. Eu converso com você, analiso o projeto e programo quando você pedir.' }]
 };
 
 const projectName = document.querySelector('#projectName');
@@ -280,6 +281,7 @@ function renderPlan(data) {
       </div>`
     : '';
   const article = addMessage('assistant', data.summary, planHtml);
+  state.chatHistory.push({ role: 'assistant', content: data.summary });
   article.querySelector('[data-plan]')?.addEventListener('click', applyPlan);
 }
 
@@ -289,6 +291,7 @@ async function sendCodeRequest(message) {
   state.busy = true;
   sendCodeButton.disabled = true;
   codePromptInput.value = '';
+  state.chatHistory.push({ role: 'user', content: clean });
   addMessage('user', clean);
   const thinking = addThinking();
   try {
@@ -296,7 +299,8 @@ async function sendCodeRequest(message) {
       method: 'POST',
       body: JSON.stringify({
         message: clean,
-        contextFiles: [...state.openFiles.keys()]
+        contextFiles: [...state.openFiles.keys()],
+        history: state.chatHistory
       })
     });
     thinking.remove();

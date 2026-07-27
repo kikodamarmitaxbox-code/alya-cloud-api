@@ -440,7 +440,7 @@ const server = http.createServer(async (req, res) => {
       if (!expensiveLimiter.check(req, res)) return;
       if (!requireAuth(req, res)) return;
       const body = await readJsonBody(req);
-      const result = await codeAgent.createCodePlan(body.message, body.contextFiles);
+      const result = await codeAgent.createCodePlan(body.message, body.contextFiles, body.history);
       sendJson(res, 200, result);
       return;
     }
