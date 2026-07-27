@@ -71,6 +71,7 @@ const modelStatusPill = document.querySelector('#modelStatusPill');
 const modelStatusText = document.querySelector('#modelStatusText');
 const toastContainer = document.querySelector('#toastContainer');
 const systemButton = document.querySelector('#systemButton');
+const codeAlyaButton = document.querySelector('#codeAlyaButton');
 const systemModal = document.querySelector('#systemModal');
 const closeSystemButton = document.querySelector('#closeSystemButton');
 const refreshSystemButton = document.querySelector('#refreshSystemButton');
@@ -1228,6 +1229,9 @@ document.querySelectorAll('[data-tool-prompt]').forEach((button) => {
 
 authForm?.addEventListener('submit', submitAuthentication);
 systemButton?.addEventListener('click', openSystemDashboard);
+codeAlyaButton?.addEventListener('click', () => {
+  window.location.href = '/code-alya';
+});
 closeSystemButton?.addEventListener('click', () => { systemModal.hidden = true; });
 refreshSystemButton?.addEventListener('click', loadSystemDashboard);
 saveSystemModelButton?.addEventListener('click', saveSystemModel);

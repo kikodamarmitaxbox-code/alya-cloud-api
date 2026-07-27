@@ -12,6 +12,7 @@
 
 - Chat com IA
 - Alya Code no terminal para ler, editar e testar projetos com confirmação
+- Code Alya: painel visual com chat, editor, arquivos e terminal seguro
 - Multiplas conversas
 - Personalidade e modo configurados
 - Memoria persistente
@@ -42,3 +43,11 @@ https://aistudio.google.com/app/apikey e coloque `GEMINI_API_KEY` no arquivo
 
 A Alya Code pede confirmacao antes de alterar arquivos ou executar testes.
 Use `/help` para ver os comandos e `/undo` para desfazer a ultima tarefa.
+
+## Code Alya (painel visual)
+
+Abra `http://localhost:3000/code-alya` ou use o botão **Code Alya** dentro da Alya.
+Ela mostra os arquivos do projeto, um editor e um terminal com comandos permitidos.
+No chat, descreva o que quer criar: a Code Alya prepara um plano e só aplica as
+mudanças após você clicar em **Aplicar mudanças**. Antes de escrever, ela salva
+uma cópia do arquivo; `.env`, chaves e pastas internas permanecem bloqueados.

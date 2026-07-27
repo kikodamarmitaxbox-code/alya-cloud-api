@@ -23,6 +23,7 @@ const notifications = require('./lib/notifications');
 const computerControl = require('./lib/computerControl');
 const persistentStore = require('./lib/persistentStore');
 const metrics = require('./lib/metrics');
+const codeAgent = require('./lib/codeAgent');
 
 const root = __dirname;
 const publicDir = path.join(root, 'public');
@@ -420,6 +421,53 @@ const server = http.createServer(async (req, res) => {
       if (!expensiveLimiter.check(req, res)) return;
       if (!requireAuth(req, res)) return;
       await handleAlyFile(req, res);
+      return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/code-alya/workspace') {
+      if (!requireAuth(req, res)) return;
+      sendJson(res, 200, codeAgent.getWorkspaceStatus());
+      return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/code-alya/file') {
+      if (!requireAuth(req, res)) return;
+      sendJson(res, 200, { ok: true, ...codeAgent.readProjectFile(url.searchParams.get('path')) });
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/code-alya/plan') {
+      if (!expensiveLimiter.check(req, res)) return;
+      if (!requireAuth(req, res)) return;
+      const body = await readJsonBody(req);
+      const result = await codeAgent.createCodePlan(body.message, body.contextFiles);
+      sendJson(res, 200, result);
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/code-alya/apply') {
+      if (!apiLimiter.check(req, res)) return;
+      if (!requireAuth(req, res)) return;
+      const body = await readJsonBody(req);
+      const result = await codeAgent.applyCodePlan(body.planId);
+      sendJson(res, 200, result);
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/code-alya/command') {
+      if (!apiLimiter.check(req, res)) return;
+      if (!requireAuth(req, res)) return;
+      const body = await readJsonBody(req);
+      const result = await codeAgent.runSafeCommand(body.command);
+      sendJson(res, result.ok ? 200 : 400, result);
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/code-alya/file') {
+      if (!apiLimiter.check(req, res)) return;
+      if (!requireAuth(req, res)) return;
+      const body = await readJsonBody(req);
+      sendJson(res, 200, codeAgent.saveProjectFile(body.path, body.content));
       return;
     }
 
@@ -914,6 +962,11 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method !== 'GET') {
       sendJson(res, 405, { error: 'Metodo nao permitido.' });
+      return;
+    }
+
+    if (url.pathname === '/code-alya') {
+      serveStatic('/code-alya.html', res);
       return;
     }
 
