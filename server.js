@@ -172,7 +172,9 @@ async function handleAlyImage(req, res) {
   };
   const format = formats[imageType];
   const fullPrompt = `${prompt}. Create a ${format.label}. ${styles[imageStyle]}. High quality, polished details, balanced composition, beautiful background, no watermark, no logo, no readable text. Appropriate for all ages.`;
-  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${format.width}&height=${format.height}&seed=${Date.now()}&nologo=true`;
+  // O provedor gratuito falha de forma intermitente quando recebe um seed manual.
+  // Sem seed, ele escolhe a variação e responde de forma mais estável.
+  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${format.width}&height=${format.height}&nologo=true`;
 
   sendJson(res, 200, { ok: true, imageUrl, imageType, imageStyle });
 }
