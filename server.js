@@ -1479,19 +1479,19 @@ async function handleSaveHistory(req) {
 async function handleWriteFile(req) {
   const body = await readJsonBody(req);
   const { path: filePath, content, approved = false } = body;
-  return writeFile(filePath, content, !approved);
+  return writeFile(filePath, content, approved);
 }
 
 async function handleExecuteCommand(req) {
   const body = await readJsonBody(req);
   const { command, approved = false } = body;
-  return executeCommand(command, !approved);
+  return executeCommand(command, approved);
 }
 
 async function handleInstallDependency(req) {
   const body = await readJsonBody(req);
   const { package: packageName, approved = false } = body;
-  return installDependency(packageName);
+  return installDependency(packageName, approved);
 }
 
 async function handleCreateBackup(req) {
