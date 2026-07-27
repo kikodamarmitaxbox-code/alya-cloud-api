@@ -426,13 +426,16 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && url.pathname === '/api/code-alya/workspace') {
       if (!requireAuth(req, res)) return;
-      sendJson(res, 200, codeAgent.getWorkspaceStatus());
+      await sendCodeAgentResponse(res, () => codeAgent.getWorkspaceStatus());
       return;
     }
 
     if (req.method === 'GET' && url.pathname === '/api/code-alya/file') {
       if (!requireAuth(req, res)) return;
-      sendJson(res, 200, { ok: true, ...codeAgent.readProjectFile(url.searchParams.get('path')) });
+      await sendCodeAgentResponse(res, () => ({
+        ok: true,
+        ...codeAgent.readProjectFile(url.searchParams.get('path'))
+      }));
       return;
     }
 
@@ -440,8 +443,11 @@ const server = http.createServer(async (req, res) => {
       if (!expensiveLimiter.check(req, res)) return;
       if (!requireAuth(req, res)) return;
       const body = await readJsonBody(req);
-      const result = await codeAgent.createCodePlan(body.message, body.contextFiles, body.history);
-      sendJson(res, 200, result);
+      await sendCodeAgentResponse(res, () => codeAgent.createCodePlan(
+        body.message,
+        body.contextFiles,
+        body.history
+      ));
       return;
     }
 
@@ -449,8 +455,7 @@ const server = http.createServer(async (req, res) => {
       if (!apiLimiter.check(req, res)) return;
       if (!requireAuth(req, res)) return;
       const body = await readJsonBody(req);
-      const result = await codeAgent.applyCodePlan(body.planId);
-      sendJson(res, 200, result);
+      await sendCodeAgentResponse(res, () => codeAgent.applyCodePlan(body.planId));
       return;
     }
 
@@ -458,8 +463,7 @@ const server = http.createServer(async (req, res) => {
       if (!apiLimiter.check(req, res)) return;
       if (!requireAuth(req, res)) return;
       const body = await readJsonBody(req);
-      const result = await codeAgent.runSafeCommand(body.command);
-      sendJson(res, result.ok ? 200 : 400, result);
+      await sendCodeAgentResponse(res, () => codeAgent.runSafeCommand(body.command));
       return;
     }
 
@@ -467,7 +471,7 @@ const server = http.createServer(async (req, res) => {
       if (!apiLimiter.check(req, res)) return;
       if (!requireAuth(req, res)) return;
       const body = await readJsonBody(req);
-      sendJson(res, 200, codeAgent.saveProjectFile(body.path, body.content));
+      await sendCodeAgentResponse(res, () => codeAgent.saveProjectFile(body.path, body.content));
       return;
     }
 
@@ -1070,6 +1074,19 @@ function requireAuth(req, res) {
   if (isAuthenticated(req)) return true;
   sendJson(res, 401, { error: 'Digite a senha para entrar na Alya.' });
   return false;
+}
+
+async function sendCodeAgentResponse(res, operation) {
+  try {
+    const result = await operation();
+    sendJson(res, result?.ok === false ? 400 : 200, result);
+  } catch (error) {
+    const message = error instanceof Error && error.message
+      ? error.message
+      : 'A Code Alya não conseguiu concluir essa ação.';
+    logger.warn(`Code Alya: ${message}`);
+    sendJson(res, 400, { ok: false, error: message });
+  }
 }
 
 async function handleLogin(req, res) {
