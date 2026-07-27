@@ -1004,7 +1004,7 @@ async function sendMessage(content) {
     return;
   }
 
-  const messagesForRequest = history.slice(-8).map((message, index, list) => {
+  const messagesForRequest = history.slice(-6).map((message, index, list) => {
     if (!attachmentForRequest || index !== list.length - 1 || message.role !== 'user') return message;
     return {
       role: 'user',

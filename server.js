@@ -1106,7 +1106,7 @@ async function handleAlyChat(req, res) {
   const messages = Array.isArray(body.messages) ? body.messages : [];
   const safeMessages = messages
     .filter((message) => message && ['user', 'assistant'].includes(message.role))
-    .slice(-8)
+    .slice(-6)
     .map((message) => ({
       role: message.role,
       content: String(message.content || '').slice(0, 2400)
@@ -1178,7 +1178,7 @@ async function handleAlyChatStream(req, res) {
   const messages = Array.isArray(body.messages) ? body.messages : [];
   const safeMessages = messages
     .filter((message) => message && ['user', 'assistant'].includes(message.role))
-    .slice(-8)
+    .slice(-6)
     .map((message) => ({
       role: message.role,
       content: String(message.content || '').slice(0, 2400)
