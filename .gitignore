@@ -1,6 +1,7 @@
 .env*
 !.env.example
 node_modules/
+.alya-code/
 *.log
 nova-data/
 tools/

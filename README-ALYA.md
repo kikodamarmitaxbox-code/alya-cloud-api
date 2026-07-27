@@ -11,6 +11,7 @@
 ## Funcionalidades
 
 - Chat com IA
+- Alya Code no terminal para ler, editar e testar projetos com confirmação
 - Multiplas conversas
 - Personalidade e modo configurados
 - Memoria persistente
@@ -26,3 +27,18 @@
 - O link e gerado automaticamente pelo Cloudflare Tunnel
 - O link fica disponivel enquanto o programa estiver aberto
 - Nao precisa configurar nada adicional
+
+## Alya Code no terminal
+
+Abra o terminal na pasta do projeto e execute:
+
+```powershell
+npm run code
+```
+
+O modelo principal e `gemini-3.5-flash`. Crie uma chave gratuita em
+https://aistudio.google.com/app/apikey e coloque `GEMINI_API_KEY` no arquivo
+`.env`. Sem essa chave, a Alya Code tenta automaticamente o Mistral configurado.
+
+A Alya Code pede confirmacao antes de alterar arquivos ou executar testes.
+Use `/help` para ver os comandos e `/undo` para desfazer a ultima tarefa.
