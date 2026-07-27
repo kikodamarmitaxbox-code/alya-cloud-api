@@ -988,6 +988,9 @@ body.light-theme .welcome-card-desc { color: #777083; }
 .image-studio-result img { width: 100%; max-height: 430px; object-fit: contain; border-radius: 12px; background: rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.12); }
 .image-studio-result a { color: #c9b9ff; font-size: .84rem; text-decoration: none; }
 .image-studio-result a:hover { text-decoration: underline; }
+.chat-generated-image { display: block; width: min(100%, 520px); max-height: 560px; object-fit: contain; margin-top: 12px; border-radius: 14px; border: 1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.22); }
+.chat-generated-image-link { display: inline-block; margin-top: 8px; color: #c9b9ff; font-size: .82rem; text-decoration: none; }
+.chat-generated-image-link:hover { text-decoration: underline; }
 body.light-theme .image-type-option, body.light-theme #imagePrompt { border-color: rgba(73,58,116,.16); background: rgba(255,255,255,.75); }
 body.light-theme .image-style-option { border-color: rgba(73,58,116,.16); background: rgba(255,255,255,.75); }
 body.light-theme .image-style-option:hover, body.light-theme .image-style-option.active { color: #403367; background: #eee9ff; }

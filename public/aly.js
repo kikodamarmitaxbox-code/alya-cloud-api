@@ -213,6 +213,41 @@ function appendMessage(role, content) {
   scrollToBottom();
 }
 
+function getImageRequestFromChat(text) {
+  const cleaned = String(text || '').trim();
+  const match = cleaned.match(/^(?:cria|crie|faz|faça|gera|gere|desenha|desenhe)\s+(?:uma?\s+)?(?:imagem|foto|avatar|banner|arte|desenho)\s*(?:de|do|da|com)?\s*(.+)$/i);
+  if (!match?.[1]?.trim()) return null;
+
+  const prompt = match[1].trim();
+  const normalized = `${cleaned} ${prompt}`.toLowerCase();
+  const type = /banner|capa/.test(normalized) ? 'banner' : /avatar|perfil|foto/.test(normalized) ? 'avatar' : 'personagem';
+  const style = /anime|mangá|manga|luffy|one piece|naruto|dragon ball/.test(normalized) ? 'anime' : 'cinematico';
+  return { prompt, type, style };
+}
+
+async function createImageFromChat(request) {
+  appendMessage('assistant', '✦ Estou criando sua imagem...');
+  try {
+    const response = await fetch(`${apiBase}/api/aly-image`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request)
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.imageUrl) throw new Error(data.error || 'Não consegui criar a imagem agora.');
+
+    history.push({ role: 'assistant', content: '✦ Pronta! Aqui está sua imagem.', imageUrl: data.imageUrl, imagePrompt: request.prompt });
+    saveConversationHistory(currentConversationId, history);
+    renderSidebarConversations();
+    render();
+  } catch (error) {
+    history.push({ role: 'assistant', content: 'Não consegui criar a imagem agora. Tente novamente daqui a pouco.' });
+    saveConversationHistory(currentConversationId, history);
+    renderSidebarConversations();
+    render();
+  }
+}
+
 function addChatMessageActions(article, message, index) {
   const actions = document.createElement('div');
   actions.className = 'chat-message-actions';
@@ -581,6 +616,22 @@ function render() {
     content.className = 'message-content';
     content.textContent = message.content || '...';
 
+    if (message.imageUrl) {
+      const image = document.createElement('img');
+      image.className = 'chat-generated-image';
+      image.src = message.imageUrl;
+      image.alt = message.imagePrompt || 'Imagem criada pela Alya';
+      image.loading = 'lazy';
+      image.referrerPolicy = 'no-referrer';
+      const openImage = document.createElement('a');
+      openImage.href = message.imageUrl;
+      openImage.target = '_blank';
+      openImage.rel = 'noopener';
+      openImage.textContent = 'Abrir em tamanho grande ↗';
+      openImage.className = 'chat-generated-image-link';
+      content.append(image, openImage);
+    }
+
     article.append(label, content);
     addChatMessageActions(article, message, index);
     messagesEl.appendChild(article);
@@ -608,6 +659,13 @@ async function sendMessage(content) {
   if (await tryComputerCommand(content.trim())) {
     setBusy(false);
     saveConversationHistory(currentConversationId, history);
+    return;
+  }
+
+  const imageRequest = getImageRequestFromChat(content.trim());
+  if (imageRequest) {
+    await createImageFromChat(imageRequest);
+    setBusy(false);
     return;
   }
 
