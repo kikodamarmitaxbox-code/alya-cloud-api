@@ -621,15 +621,14 @@ function render() {
       image.className = 'chat-generated-image';
       image.src = message.imageUrl;
       image.alt = message.imagePrompt || 'Imagem criada pela Alya';
-      image.loading = 'lazy';
       image.referrerPolicy = 'no-referrer';
-      const openImage = document.createElement('a');
-      openImage.href = message.imageUrl;
-      openImage.target = '_blank';
-      openImage.rel = 'noopener';
-      openImage.textContent = 'Abrir em tamanho grande ↗';
-      openImage.className = 'chat-generated-image-link';
-      content.append(image, openImage);
+      image.addEventListener('error', () => {
+        const error = document.createElement('p');
+        error.className = 'chat-image-error';
+        error.textContent = 'A imagem não carregou. Tente criar de novo daqui a pouco.';
+        image.replaceWith(error);
+      }, { once: true });
+      content.append(image);
     }
 
     article.append(label, content);

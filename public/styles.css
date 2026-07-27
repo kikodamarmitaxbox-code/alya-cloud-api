@@ -991,6 +991,7 @@ body.light-theme .welcome-card-desc { color: #777083; }
 .chat-generated-image { display: block; width: min(100%, 520px); max-height: 560px; object-fit: contain; margin-top: 12px; border-radius: 14px; border: 1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.22); }
 .chat-generated-image-link { display: inline-block; margin-top: 8px; color: #c9b9ff; font-size: .82rem; text-decoration: none; }
 .chat-generated-image-link:hover { text-decoration: underline; }
+.chat-image-error { margin: 12px 0 0; color: #f0b3c2; font-size: .84rem; }
 body.light-theme .image-type-option, body.light-theme #imagePrompt { border-color: rgba(73,58,116,.16); background: rgba(255,255,255,.75); }
 body.light-theme .image-style-option { border-color: rgba(73,58,116,.16); background: rgba(255,255,255,.75); }
 body.light-theme .image-style-option:hover, body.light-theme .image-style-option.active { color: #403367; background: #eee9ff; }
