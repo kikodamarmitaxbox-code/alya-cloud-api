@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/code-alya.css?v=20260727c" />
+  <link rel="stylesheet" href="/code-alya.css?v=20260727d" />
 </head>
 <body>
   <div class="code-app">
@@ -121,7 +121,7 @@
           <article class="message assistant-message">
             <div class="message-label">ALYA</div>
             <div class="message-content">
-              <p>Oi, Pedro! Me conta o que você quer criar. Eu analiso o projeto, preparo as mudanças e mostro tudo antes de aplicar.</p>
+              <p>Oi, Pedro! Conversa comigo como se eu estivesse no seu terminal. Posso criar, corrigir, testar, instalar pacotes e preparar Git — sempre mostrando antes o que vou fazer.</p>
             </div>
           </article>
           <div class="starter-grid">
@@ -135,10 +135,12 @@
           <div id="contextFiles"></div>
         </div>
 
+        <div class="agent-capabilities"><span>Modo agente</span><i>Arquivos</i><i>Testes</i><i>Pacotes</i><i>Git</i></div>
+
         <form id="codeChatForm" class="chat-composer">
           <textarea id="codePromptInput" rows="3" placeholder="Peça para a Code Alya programar..." maxlength="4000"></textarea>
           <div class="composer-footer">
-            <span><i></i> Alterações exigem aprovação</span>
+            <span><i></i> Você aprova cada plano</span>
             <button id="sendCodeButton" type="submit" aria-label="Enviar pedido">↑</button>
           </div>
         </form>
@@ -147,6 +149,6 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/code-alya.js?v=20260727c"></script>
+  <script src="/code-alya.js?v=20260727d"></script>
 </body>
 </html>

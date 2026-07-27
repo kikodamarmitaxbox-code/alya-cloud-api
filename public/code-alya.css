@@ -422,6 +422,10 @@ kbd { margin-left: 5px; color: var(--quiet); background: rgba(255,255,255,.05); 
 #contextFiles { display: flex; gap: 4px; overflow-x: auto; }
 .context-chip { white-space: nowrap; border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; color: #aeb7c8; font: 8px var(--mono); }
 
+.agent-capabilities { display: flex; align-items: center; gap: 5px; overflow-x: auto; padding: 9px 11px 0; color: var(--quiet); font-size: 8px; }
+.agent-capabilities span { color: #aa9bff; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-right: 2px; }
+.agent-capabilities i { font-style: normal; color: #9ba6b9; border: 1px solid var(--line); border-radius: 5px; padding: 3px 5px; }
+
 .chat-composer {
   margin: 10px 11px 12px;
   border: 1px solid rgba(255,255,255,.11);
