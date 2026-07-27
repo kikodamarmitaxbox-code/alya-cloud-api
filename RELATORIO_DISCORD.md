@@ -1,4 +1,4 @@
-# Relatório de Integração com Discord — Astra v2.0
+# Relatório de Integração com Discord — Alya v2.0
 
 ## 1. Como a integração com o Discord deve ser implementada
 
@@ -75,7 +75,7 @@ Usuário Discord → Discord Gateway → discord.js → /api/discord/receive
 **`public/discord-panel.html` (opcional)** — Painel dedicado
 - Se for separado do painel principal, senão reusar estrutura do WhatsApp já existente
 
-## 4. Como a Astra irá se comunicar com o Discord
+## 4. Como a Alya irá se comunicar com o Discord
 
 **Via discord.js (WebSocket Gateway):**
 - O bot se conecta ao gateway do Discord usando `DISCORD_BOT_TOKEN`
@@ -108,7 +108,7 @@ Cada usuário Discord terá:
 2. Bot envia últimas 10 mensagens + nova mensagem para `lib/chat.js`
 3. `lib/chat.js` gera resposta com system prompt incluindo:
    - Personalidade configurada em `profile.json`
-   - Memória da Astra
+   - Memória da Alya
    - Histórico recente
 4. Após resposta, salva par user+assistant no histórico
 5. Limpa arquivos com mais de 100 mensagens (igual WhatsApp)

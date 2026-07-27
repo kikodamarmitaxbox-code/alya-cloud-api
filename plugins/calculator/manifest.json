@@ -1,0 +1,8 @@
+{
+  "id": "calculator",
+  "name": "Calculadora Rápida",
+  "version": "1.0.0",
+  "description": "Realiza cálculos matemáticos precisos em respostas da Alya.",
+  "author": "Alya Core",
+  "enabled": true
+}

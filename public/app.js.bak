@@ -200,7 +200,7 @@ if (history.length === 0) {
   history = [
     {
       role: "assistant",
-      content: "Oi, eu sou a Astra. Posso te ajudar com ideias, estudos, textos e organizacao."
+      content: "Oi, eu sou a Alya. Posso te ajudar com ideias, estudos, textos e organizacao."
     }
   ];
 }
@@ -475,7 +475,7 @@ function render() {
 
     const label = document.createElement("span");
     label.className = "message-label";
-    label.textContent = message.role === "user" ? "Voce" : "Astra";
+    label.textContent = message.role === "user" ? "Voce" : "Alya";
 
     const content = document.createElement("div");
     content.className = "message-content";
@@ -917,7 +917,7 @@ function prepareFileProfileEdit(assistantMessage) {
   try {
     const config = JSON.parse(match[1]);
     const profile = {
-      name: "Astra",
+      name: "Alya",
       personality: settings.personality,
       memory: settings.memory
     };
@@ -1052,15 +1052,15 @@ function exportConversation() {
     case 'json':
       content = JSON.stringify(history, null, 2);
       mimeType = 'application/json';
-      filename = `conversa-astra-${stamp}.json`;
+      filename = `conversa-alya-${stamp}.json`;
       break;
     case 'md':
       content = history.map((message) => {
-        const label = message.role === "user" ? "### Você" : "### Astra";
+        const label = message.role === "user" ? "### Você" : "### Alya";
         return `${label}\n\n${message.content}\n\n---`;
       }).join('\n');
       mimeType = 'text/markdown';
-      filename = `conversa-astra-${stamp}.md`;
+      filename = `conversa-alya-${stamp}.md`;
       break;
     case 'pdf':
       exportToPDF(stamp);
@@ -1068,11 +1068,11 @@ function exportConversation() {
     case 'txt':
     default:
       content = history.map((message) => {
-        const label = message.role === "user" ? "Voce" : "Astra";
+        const label = message.role === "user" ? "Voce" : "Alya";
         return `${label}: ${message.content}`;
       }).join('\n\n');
       mimeType = 'text/plain';
-      filename = `conversa-astra-${stamp}.txt`;
+      filename = `conversa-alya-${stamp}.txt`;
   }
 
   const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
@@ -1093,7 +1093,7 @@ function exportToPDF(stamp) {
   
   let y = 20;
   doc.setFontSize(16);
-  doc.text('Conversa com Astra', 20, y);
+  doc.text('Conversa com Alya', 20, y);
   y += 15;
   
   doc.setFontSize(12);
@@ -1103,7 +1103,7 @@ function exportToPDF(stamp) {
       y = 20;
     }
     
-    const label = message.role === "user" ? "Você:" : "Astra:";
+    const label = message.role === "user" ? "Você:" : "Alya:";
     doc.setFont(undefined, 'bold');
     doc.text(label, 20, y);
     y += 7;
@@ -1121,7 +1121,7 @@ function exportToPDF(stamp) {
     y += 5;
   });
   
-  doc.save(`conversa-astra-${stamp}.pdf`);
+  doc.save(`conversa-alya-${stamp}.pdf`);
 }
 
 // WhatsApp approval system
@@ -1196,7 +1196,7 @@ function openSettings() {
   if (!settingsModal) return;
   const appSettings = loadAppSettings();
   if (settingsLanguage) settingsLanguage.value = appSettings.language || "pt-BR";
-  if (settingsAiName) settingsAiName.value = appSettings.aiName || "Astra";
+  if (settingsAiName) settingsAiName.value = appSettings.aiName || "Alya";
   if (settingsUserName) settingsUserName.value = appSettings.userName || getUserName();
   if (settingsWelcomeToggle) settingsWelcomeToggle.checked = getWelcomeEnabled();
   if (settingsSoundToggle) settingsSoundToggle.checked = appSettings.soundEnabled !== false;
@@ -1216,7 +1216,7 @@ function switchSettingsTab(tabId) {
 function applySettings() {
   const updates = {
     language: settingsLanguage?.value || "pt-BR",
-    aiName: settingsAiName?.value?.trim() || "Astra",
+    aiName: settingsAiName?.value?.trim() || "Alya",
     userName: settingsUserName?.value?.trim() || "Pedro",
     welcomeEnabled: settingsWelcomeToggle?.checked ?? true,
     soundEnabled: settingsSoundToggle?.checked ?? true
@@ -1290,7 +1290,7 @@ searchInput.addEventListener("input", () => {
 
   searchResults.innerHTML = results.map((message, index) => `
     <div class="search-result">
-      <span class="search-role">${message.role === 'user' ? 'Você' : 'Astra'}:</span>
+      <span class="search-role">${message.role === 'user' ? 'Você' : 'Alya'}:</span>
       <p class="search-content">${message.content.slice(0, 200)}${message.content.length > 200 ? '...' : ''}</p>
     </div>
   `).join('');
@@ -1907,6 +1907,6 @@ document.addEventListener("keydown", (event) => {
 helpButton = document.querySelector("#helpButton");
 if (helpButton) {
   helpButton.addEventListener("click", () => {
-    alert("Astra - Assistente IA\n\nRecursos:\n- Chat com IA\n- Memoria persistente\n- Modo Dev\n- Integracao WhatsApp\n- Integracao Discord\n- Exportacao de conversas\n\nUse os botoes no topo para acessar as funcionalidades.");
+    alert("Alya - Assistente IA\n\nRecursos:\n- Chat com IA\n- Memoria persistente\n- Modo Dev\n- Integracao WhatsApp\n- Integracao Discord\n- Exportacao de conversas\n\nUse os botoes no topo para acessar as funcionalidades.");
   });
 }

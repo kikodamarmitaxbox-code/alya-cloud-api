@@ -1,29 +1,31 @@
 services:
   - type: web
-    name: astra-ia
+    name: alya-ia
     env: node
     plan: free
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /health
-  envVars:
-    - key: AI_PROVIDER
-      value: openrouter
-    - key: OPENROUTER_MODEL
-      value: openrouter/free
-    - key: MAX_TOKENS
-      value: 500
-    - key: OPENROUTER_API_KEY
-      sync: false
-    - key: FRIEND_USERS
-      sync: false
-    - key: SITE_PASSWORD
-      sync: false
-    - key: DISCORD_BOT_TOKEN
-      sync: false
-    - key: DISCORD_CLIENT_ID
-      sync: false
-    - key: DISCORD_ENABLED
-      value: "false"
-    - key: DISCORD_APPROVAL_REQUIRED
-      value: "false"
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: AI_PROVIDER
+        value: openrouter
+      - key: OPENROUTER_MODEL
+        value: openrouter/free
+      - key: MAX_TOKENS
+        value: "500"
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: FRIEND_USERS
+        sync: false
+      - key: SITE_PASSWORD
+        sync: false
+      - key: DISCORD_BOT_TOKEN
+        sync: false
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_ENABLED
+        value: "false"
+      - key: DISCORD_APPROVAL_REQUIRED
+        value: "false"

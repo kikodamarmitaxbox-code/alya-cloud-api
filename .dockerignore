@@ -1,0 +1,12 @@
+.git
+.env
+.env.*
+!.env.example
+node_modules
+npm-debug.log*
+*.log
+.vscode
+.DS_Store
+Thumbs.db
+nova-data/backups
+nova-data/discord-uploads

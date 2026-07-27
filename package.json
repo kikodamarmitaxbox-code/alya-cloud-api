@@ -4,18 +4,21 @@
   "private": true,
   "description": "Assistente de IA leve usando APIs gratuitas com limite.",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node --max-old-space-size=256 server.js",
+    "dev": "node --max-old-space-size=256 server.js"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
+    "@discordjs/opus": "^0.10.0",
+    "@discordjs/voice": "^0.18.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "discord.js": "^14.27.0",
     "express-rate-limit": "^7.1.5",
     "jspdf": "^2.5.1",
+    "libsodium-wrappers": "^0.8.4",
     "winston": "^3.11.0"
   }
 }

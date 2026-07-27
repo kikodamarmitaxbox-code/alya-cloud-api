@@ -4,147 +4,238 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Alya Assistente</title>
-  <link rel="stylesheet" href="aly.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
+  <style>
+    .public-link-label { font-weight: 600; color: var(--text-secondary); }
+    .public-link-text { flex: 1; font-family: var(--font-mono); color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .public-link-copy, .public-link-restart {
+      background: rgba(255, 255, 255, 0.08); border: none; color: #fff; border-radius: 6px; padding: 4px 12px; cursor: pointer; transition: 0.2s;
+    }
+    .public-link-copy:hover, .public-link-restart:hover { background: rgba(255, 255, 255, 0.16); }
+  </style>
 </head>
-<body>
+<body class="app-shell">
+
+  <!-- Sidebar -->
   <aside id="sidebar" class="sidebar" aria-label="Menu lateral">
-    <div class="sidebar-header">
-      <div class="sidebar-brand">
-        <span class="brand-mark" aria-hidden="true">A</span>
-        <div>
-          <p class="eyebrow">Assistente pessoal</p>
-          <h1>Alya Assistente</h1>
-        </div>
+    <div class="sidebar-top">
+      <div class="sidebar-logo">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" fill="url(#starGradAly)" />
+          <defs><linearGradient id="starGradAly" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse"><stop stop-color="#7c6ef0" /><stop offset="1" stop-color="#5b8dee" /></linearGradient></defs>
+        </svg>
+        <h1>Alya</h1>
       </div>
-      <button id="newConversationButton" class="new-conversation-btn" type="button" title="Nova conversa">
-        <span aria-hidden="true">+</span> Nova conversa
-      </button>
-      <div class="search-box">
-        <input id="searchConversationsInput" type="text" placeholder="Buscar conversas..." />
-      </div>
+      <button id="composeIconButton" class="sidebar-new-btn" type="button" title="Nova conversa" aria-label="Nova conversa">✦</button>
     </div>
+
+    <button id="newConversationButton" class="new-conversation-btn" type="button" title="Nova conversa">
+      <span>+</span> Nova conversa
+    </button>
+
+    <nav class="sidebar-nav">
+      <button class="sidebar-nav-item active" type="button">
+        <div class="sidebar-nav-left"><span>◌</span> <span>Conversas</span></div>
+      </button>
+      <button id="settingsButton" class="sidebar-nav-item" type="button">
+        <div class="sidebar-nav-left"><span>⌘</span> <span>Configurações</span></div>
+      </button>
+      <button id="helpButton" class="sidebar-nav-item" type="button">
+        <div class="sidebar-nav-left"><span>?</span> <span>Ajuda</span></div>
+      </button>
+    </nav>
+
+    <div class="sidebar-section-title">
+      <span>Conversas recentes</span>
+    </div>
+
+    <label class="sidebar-search" for="searchConversationsInput">
+      <span>⌕</span>
+      <input id="searchConversationsInput" type="search" placeholder="Buscar conversas" autocomplete="off" />
+    </label>
+
     <div class="sidebar-body">
       <div id="conversationsListSidebar" class="conversations-list"></div>
     </div>
-    <div class="sidebar-footer">
-      <button id="themeButton" class="sidebar-footer-btn" type="button" title="Alternar tema" aria-label="Alternar tema">
-        <span class="sidebar-icon" aria-hidden="true">&#9728;</span>
-        <span>Tema</span>
-      </button>
-      <button id="settingsButton" class="sidebar-footer-btn" type="button" title="Configuracoes" aria-label="Configuracoes">
-        <span class="sidebar-icon" aria-hidden="true">&#9881;</span>
-        <span>Configuracoes</span>
-      </button>
-      <button id="helpButton" class="sidebar-footer-btn" type="button" title="Ajuda" aria-label="Ajuda">
-        <span class="sidebar-icon" aria-hidden="true">&#63;</span>
-        <span>Ajuda</span>
-      </button>
+
+    <div class="sidebar-profile" id="userProfileButton">
+      <div style="display:flex;align-items:center">
+        <div class="profile-avatar alya-avatar"><img src="images/alya-avatar.png" alt="Alya" /><div class="profile-online-dot"></div></div>
+        <div class="profile-info">
+          <span class="profile-name">Pedro</span>
+          <span class="profile-role">Conta Privada</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-pro-card" aria-label="Plano Alya Pro">
+      <div class="sidebar-pro-icon">✦</div>
+      <div><strong>Alya Pro</strong><span>Mais recursos para criar</span></div>
     </div>
   </aside>
 
+  <!-- Main Panel -->
   <section class="main-panel" aria-label="Area principal">
+    <div id="publicLinkBanner" class="public-link-banner" hidden>
+      <span id="publicLinkStatus" class="public-link-status"></span>
+      <span class="public-link-label">Link público:</span>
+      <span id="publicLinkText" class="public-link-text"></span>
+      <button id="copyPublicLink" class="public-link-copy" type="button" title="Copiar">Copiar</button>
+      <button id="restartTunnel" class="public-link-restart" type="button" title="Reiniciar">Reiniciar</button>
+    </div>
+
+    <div id="loadingScreen" class="loading-screen">
+      <div class="loading-inner">
+        <span class="brand-mark">✦</span>
+        <h1 class="loading-title">Alya Assistente</h1>
+        <p id="loadingStatus" class="loading-status">Inicializando...</p>
+        <div class="loading-bar"><div id="loadingBar" class="loading-bar-fill"></div></div>
+        <p id="soundPrompt" class="loading-sound-prompt" hidden>🔊 Clique para ativar o som</p>
+      </div>
+    </div>
+
+    <audio id="startupSound" preload="auto" src="sounds/startup.wav"></audio>
+
+    <!-- Header -->
+    <header class="main-header">
+      <div class="header-groups">
+        <button class="mobile-menu-button" type="button" aria-label="Abrir menu">☰</button>
+        <div class="conversation-heading"><span class="heading-dot"></span><span>Nova conversa</span></div>
+      </div>
+      <div class="header-actions">
+        <button id="searchButton" class="icon-btn header-search-button" type="button" title="Buscar na conversa" aria-label="Buscar na conversa">⌕</button>
+        <button id="themeButton" class="icon-btn theme-button" type="button" title="Alterar tema" aria-label="Alterar tema">☼</button>
+        <button id="computerButton" class="share-btn" type="button" title="Controle seguro do computador">⌘ Computador</button>
+        <button id="shareLinkButton" class="share-btn" type="button" title="Compartilhar"><span>↗</span> Compartilhar</button>
+        <div class="header-avatar alya-avatar" title="Alya"><img src="images/alya-avatar.png" alt="Alya" /><div class="profile-online-dot"></div></div>
+      </div>
+    </header>
+
+    <!-- Chat Area -->
     <section class="chat-area">
       <section class="welcome" id="welcomeScreen" hidden>
         <div class="welcome-inner">
-          <span class="brand-mark" aria-hidden="true">A</span>
-          <h2 class="welcome-title">Ola! Como posso ajudar hoje?</h2>
-          <p class="welcome-subtitle">Comece a conversar livremente.</p>
+          <div class="welcome-aura" aria-hidden="true"><span>✦</span><img class="welcome-alya-photo" src="images/alya-avatar.png" alt="" /></div>
+          <p class="welcome-kicker">SEU ESPAÇO PARA CRIAR</p>
+          <p class="mobile-alya-name">Alya</p>
+          <h2 class="welcome-title">Oi, <span>Pedro.</span></h2>
+          <p class="welcome-subtitle">Por onde começamos?</p>
+          <p class="welcome-desc">Ideias, textos, estudos e planos — Alya transforma o primeiro rascunho em algo especial.</p>
+          <div class="mobile-quick-actions" aria-label="Atalhos rápidos">
+            <button class="mobile-quick-action" type="button" data-prompt="Me dê dicas rápidas sobre:">💡 Dicas rápidas</button>
+            <button class="mobile-quick-action" type="button" data-prompt="Crie um plano para:">🎯 Criar plano</button>
+            <button class="mobile-quick-action" type="button" data-prompt="Me motive para:">🌱 Motivação</button>
+          </div>
           <div class="welcome-cards">
-            <button class="welcome-card" data-prompt="Criar um texto sobre">Criar texto</button>
-            <button class="welcome-card" data-prompt="Explicar o conceito de">Explicar conceitos</button>
-            <button class="welcome-card" data-prompt="Gerar um exemplo de codigo para">Gerar codigo</button>
-            <button class="welcome-card" data-prompt="Traduzir para">Traduzir</button>
+            <button id="imageStudioButton" class="welcome-card" type="button"><div class="welcome-card-icon peach">✦</div><span class="welcome-card-title">Criar imagem</span><span class="welcome-card-desc">Avatar, banner ou personagem</span><span class="card-arrow">↗</span></button>
+            <button class="welcome-card" data-prompt="Resumir este texto:"><div class="welcome-card-icon blue">≡</div><span class="welcome-card-title">Resumir texto</span><span class="welcome-card-desc">Encontre o essencial</span><span class="card-arrow">↗</span></button>
+            <button class="welcome-card" data-prompt="Analisar este código:"><div class="welcome-card-icon lavender">&lt;/&gt;</div><span class="welcome-card-title">Analisar código</span><span class="welcome-card-desc">Corrija e evolua</span><span class="card-arrow">↗</span></button>
+            <button class="welcome-card" data-prompt="Me dê ideias sobre:"><div class="welcome-card-icon mint">✺</div><span class="welcome-card-title">Explorar ideias</span><span class="welcome-card-desc">Pense sem limites</span><span class="card-arrow">↗</span></button>
           </div>
         </div>
       </section>
 
       <div id="messages" class="messages" aria-live="polite"></div>
       <div id="typingIndicator" class="typing-indicator" hidden aria-hidden="true">
-        <span class="typing-dot"></span>
-        <span class="typing-dot"></span>
-        <span class="typing-dot"></span>
+        <span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>
       </div>
     </section>
 
+    <!-- Composer -->
     <section class="composer-section">
       <form id="chatForm" class="composer">
         <label class="sr-only" for="messageInput">Mensagem</label>
-        <textarea id="messageInput" name="message" rows="1" placeholder="Converse com a Alya..." required></textarea>
-        <button id="sendButton" class="send-btn" type="submit" title="Enviar mensagem" aria-label="Enviar mensagem">
-          <span aria-hidden="true">&#10142;</span>
-        </button>
+        <textarea id="messageInput" name="message" rows="1" placeholder="Pergunte à Alya qualquer coisa..." required></textarea>
+        <div class="composer-toolbar">
+          <div class="toolbar-left">
+            <button class="toolbar-btn" type="button" title="Anexar">＋ <span>Anexar</span></button>
+            <button class="toolbar-btn" type="button" title="Buscar">⌕ <span>Pesquisar</span></button>
+            <button class="toolbar-btn reasoning-btn" type="button" title="Raciocínio">✦ <span>Raciocinar</span></button>
+          </div>
+          <div class="toolbar-right">
+            <div class="model-select-pill"><i></i>Alya Pro <span>⌄</span></div>
+            <button id="voiceInputButton" class="voice-input-btn" type="button" title="Falar com a Alya" aria-label="Falar com a Alya">🎙</button>
+            <button id="sendButton" class="send-btn" type="submit" title="Enviar" aria-label="Enviar">↑</button>
+          </div>
+        </div>
       </form>
+      <div class="composer-disclaimer"><p>Alya pode cometer erros. Verifique informações importantes.</p></div>
     </section>
   </section>
 
-  <section id="settingsModal" class="memory-modal" aria-label="Configuracoes" hidden>
+  <!-- Settings Modal -->
+  <section id="settingsModal" class="memory-modal" aria-label="Configurações" hidden>
     <div class="memory-card">
       <header class="memory-header">
-        <h2>Configuracoes</h2>
-        <button id="closeSettingsButton" class="icon-button" type="button" title="Fechar configuracoes" aria-label="Fechar configuracoes">
-          <span aria-hidden="true">&#215;</span>
-        </button>
+        <h2>Configurações</h2>
+        <button id="closeSettingsButton" class="icon-button" type="button" title="Fechar">×</button>
       </header>
       <div class="settings-content">
         <section id="settingsGeneral" class="settings-tab" data-tab="general">
           <h3>Geral</h3>
-          <label class="setting-item" for="settingsLanguage">
-            <span>Idioma</span>
-            <select id="settingsLanguage" class="setting-select">
-              <option value="pt-BR">Portugues</option>
-              <option value="en">English</option>
-              <option value="es">Espanol</option>
-            </select>
+          <label class="setting-item" for="settingsLanguage"><span>Idioma</span>
+            <select id="settingsLanguage" class="setting-select"><option value="pt-BR">Português</option><option value="en">English</option><option value="es">Español</option></select>
           </label>
-          <label class="setting-item" for="settingsAiName">
-            <span>Nome da IA</span>
-            <input id="settingsAiName" type="text" value="Alya" />
-          </label>
-          <label class="setting-item" for="settingsUserName">
-            <span>Nome do usuario</span>
-            <input id="settingsUserName" type="text" value="Pedro" />
-          </label>
-          <label class="setting-item" for="settingsWelcomeToggle">
-            <span>Tela de boas-vindas</span>
-            <input id="settingsWelcomeToggle" type="checkbox" checked />
-          </label>
-          <label class="setting-item" for="settingsSoundToggle">
-            <span>Som de inicializacao</span>
-            <input id="settingsSoundToggle" type="checkbox" checked />
-          </label>
+          <label class="setting-item" for="settingsAiName"><span>Nome da IA</span><input id="settingsAiName" type="text" value="Alya" /></label>
+          <label class="setting-item" for="settingsUserName"><span>Nome do usuário</span><input id="settingsUserName" type="text" value="Pedro" /></label>
+          <label class="setting-item" for="settingsWelcomeToggle"><span>Tela de boas-vindas</span><input id="settingsWelcomeToggle" type="checkbox" checked /></label>
+          <label class="setting-item" for="settingsSoundToggle"><span>Som de inicialização</span><input id="settingsSoundToggle" type="checkbox" checked /></label>
+          <label class="setting-item" for="settingsSoundVolume"><span>Volume do som</span><input id="settingsSoundVolume" type="range" min="0" max="100" value="50" /></label>
+          <button id="testSoundButton" class="tool-button" type="button">Testar som</button>
         </section>
-
         <section id="settingsChat" class="settings-tab" data-tab="chat" hidden>
           <h3>Chat</h3>
-          <label class="setting-item" for="personalitySelect">
-            <span>Personalidade</span>
-            <select id="personalitySelect" class="setting-select">
-              <option value="equilibrada">Equilibrada</option>
-              <option value="direta" selected>Direta</option>
-              <option value="amiga">Amiga</option>
-              <option value="tecnica">Tecnica</option>
-              <option value="jarvis">Jarvis</option>
-            </select>
+          <label class="setting-item" for="personalitySelect"><span>Personalidade</span>
+            <select id="personalitySelect" class="setting-select"><option value="equilibrada">Equilibrada</option><option value="direta" selected>Direta</option><option value="amiga">Amiga</option><option value="tecnica">Técnica</option><option value="jarvis">Jarvis</option></select>
           </label>
-          <label class="setting-item" for="modeSelect">
-            <span>Modo</span>
-            <select id="modeSelect" class="setting-select">
-              <option value="normal" selected>Normal</option>
-              <option value="estudo">Estudo</option>
-              <option value="criativo">Criativo</option>
-              <option value="codigo">Codigo</option>
-              <option value="rapido">Rapido</option>
-            </select>
+          <label class="setting-item" for="modeSelect"><span>Modo</span>
+            <select id="modeSelect" class="setting-select"><option value="normal" selected>Normal</option><option value="estudo">Estudo</option><option value="criativo">Criativo</option><option value="codigo">Código</option><option value="rapido">Rápido</option></select>
           </label>
-          <label class="setting-item" for="memoryInput">
-            <span>Memoria</span>
-            <textarea id="memoryInput" rows="4" placeholder="Ex: Responda de forma simples. Gosto de tecnologia."></textarea>
+          <label class="setting-item" for="memoryInput"><span>Memória</span>
+            <textarea id="memoryInput" rows="4" placeholder="Ex: Responda de forma simples."></textarea>
           </label>
         </section>
       </div>
       <div class="memory-actions">
         <button id="saveSettingsButton" class="tool-button primary" type="button">Salvar</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="imageStudioModal" class="memory-modal" aria-label="Criar imagem" hidden>
+    <div class="memory-card image-studio-card">
+      <header class="memory-header">
+        <div><h2>Estúdio de imagens</h2><p>Crie uma imagem bonita para a Alya ou seu Discord.</p></div>
+        <button id="closeImageStudioButton" class="icon-button" type="button" title="Fechar">×</button>
+      </header>
+      <div class="image-studio-content">
+        <div class="image-type-grid" role="group" aria-label="Tipo de imagem">
+          <button class="image-type-option active" data-image-type="avatar" type="button"><span>◉</span> Foto de perfil</button>
+          <button class="image-type-option" data-image-type="banner" type="button"><span>▭</span> Banner</button>
+          <button class="image-type-option" data-image-type="personagem" type="button"><span>✦</span> Personagem</button>
+        </div>
+        <label class="image-prompt-label" for="imagePrompt">Como você quer a imagem?</label>
+        <textarea id="imagePrompt" rows="4" maxlength="600" placeholder="Ex.: Uma garota de anime com cabelo roxo, olhos brilhantes e roupa futurista, fundo de cidade neon"></textarea>
+        <button id="generateImageButton" class="tool-button primary image-generate-button" type="button">✦ Criar imagem</button>
+        <p id="imageStudioStatus" class="image-studio-status" aria-live="polite"></p>
+        <div id="imageStudioResult" class="image-studio-result" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="computerModal" class="memory-modal" aria-label="Controle seguro do computador" hidden>
+    <div class="memory-card">
+      <header class="memory-header"><div><h2>Computador seguro</h2><p>Alya sempre pede sua aprovação antes de fazer algo.</p></div><button id="closeComputerButton" class="icon-button" type="button">×</button></header>
+      <div class="image-studio-content">
+        <label class="image-prompt-label" for="computerRequest">O que a Alya deve fazer?</label>
+        <textarea id="computerRequest" rows="3" maxlength="600" placeholder="Ex.: abra a calculadora, abra https://youtube.com ou crie um arquivo chamado ideias"></textarea>
+        <button id="prepareComputerAction" class="tool-button primary" type="button">Preparar ação</button>
+        <div id="computerApproval" hidden><p id="computerApprovalText" class="image-studio-status"></p><button id="approveComputerAction" class="tool-button primary" type="button">Sim, pode fazer</button></div>
+        <p id="computerStatus" class="image-studio-status" aria-live="polite"></p>
       </div>
     </div>
   </section>

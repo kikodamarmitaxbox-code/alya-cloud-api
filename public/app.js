@@ -31,6 +31,29 @@ const cancelFileEditButton = document.querySelector("#cancelFileEditButton");
 const modeButtons = Array.from(document.querySelectorAll(".mode-button"));
 const typingIndicator = document.querySelector("#typingIndicator");
 
+// Dev Panel Elements
+const devPanelButton = document.querySelector("#devPanelButton");
+const devPanelModal = document.querySelector("#devPanelModal");
+const closeDevPanelButton = document.querySelector("#closeDevPanelButton");
+const devParentDirButton = document.querySelector("#devParentDirButton");
+const devFilesList = document.querySelector("#devFilesList");
+const devNewFileButton = document.querySelector("#devNewFileButton");
+const devNewFolderButton = document.querySelector("#devNewFolderButton");
+const devCurrentDir = document.querySelector(".dev-current-dir");
+const devCodeEditor = document.querySelector("#devCodeEditor");
+const devSaveFileButton = document.querySelector("#devSaveFileButton");
+const devEditingFilePath = document.querySelector("#devEditingFilePath");
+const devTabs = document.querySelectorAll(".dev-tabs .settings-nav-item");
+const devTabPanes = document.querySelectorAll(".dev-tab-pane");
+const devTerminalOutput = document.querySelector("#devTerminalOutput");
+const devConsoleForm = document.querySelector("#devConsoleForm");
+const devConsoleInput = document.querySelector("#devConsoleInput");
+const devConsoleSubmit = document.querySelector("#devConsoleSubmit");
+const devConsoleShortcuts = document.querySelectorAll(".dev-console-shortcuts button");
+const devCreateBackupButton = document.querySelector("#devCreateBackupButton");
+const devBackupsList = document.querySelector("#devBackupsList");
+const shareLinkButton = document.querySelector("#shareLinkButton");
+
 function showTypingIndicator() {
   if (!typingIndicator) return;
   typingIndicator.hidden = false;
@@ -183,7 +206,9 @@ function scrollToBottom() {
 
 const storageKey = "nova-chat-history";
 const settingsKey = "nova-settings";
-const apiBase = window.location.protocol === "file:" ? "http://localhost:3000" : "";
+const apiBase = (window.location.protocol === "file:" || ((window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && window.location.port !== "3000"))
+  ? "http://localhost:3000"
+  : "";
 let history = loadHistory();
 let settings = loadSettings();
 let pendingFileProfile = null;
@@ -203,7 +228,7 @@ if (history.length === 0) {
   history = [
     {
       role: "assistant",
-      content: "Oi, eu sou a Astra. Posso te ajudar com ideias, estudos, textos e organizacao."
+      content: "Oi, eu sou a Alya. Posso te ajudar com ideias, estudos, textos e organizacao."
     }
   ];
 }
@@ -259,6 +284,80 @@ accessForm.addEventListener("submit", async (event) => {
   }
 });
 
+// Acesso & Cadastro (Entrar / Criar Conta própria)
+const tabLoginBtn = document.querySelector('#tabLoginBtn');
+const tabRegisterBtn = document.querySelector('#tabRegisterBtn');
+const registerForm = document.querySelector('#registerForm');
+const regUsername = document.querySelector('#regUsername');
+const regPassword = document.querySelector('#regPassword');
+const regConfirmPassword = document.querySelector('#regConfirmPassword');
+const registerSubmit = document.querySelector('#registerSubmit');
+const registerError = document.querySelector('#registerError');
+const registerSuccess = document.querySelector('#registerSuccess');
+
+if (tabLoginBtn && tabRegisterBtn && registerForm && accessForm) {
+  tabLoginBtn.addEventListener('click', () => {
+    tabLoginBtn.classList.add('active');
+    tabRegisterBtn.classList.remove('active');
+    accessForm.hidden = false;
+    registerForm.hidden = true;
+  });
+
+  tabRegisterBtn.addEventListener('click', () => {
+    tabRegisterBtn.classList.add('active');
+    tabLoginBtn.classList.remove('active');
+    accessForm.hidden = true;
+    registerForm.hidden = false;
+  });
+}
+
+if (registerForm) {
+  registerForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    registerError.textContent = '';
+    registerSuccess.textContent = '';
+
+    const username = regUsername.value.trim();
+    const password = regPassword.value.trim();
+    const confirm = regConfirmPassword.value.trim();
+
+    if (!username || !password) {
+      registerError.textContent = 'Digite um usuário e uma senha.';
+      return;
+    }
+
+    if (password !== confirm) {
+      registerError.textContent = 'As senhas não coincidem!';
+      return;
+    }
+
+    registerSubmit.disabled = true;
+
+    try {
+      const response = await fetch(`${apiBase}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || data.error) {
+        throw new Error(data.error || 'Erro ao criar conta.');
+      }
+
+      registerSuccess.textContent = '✅ Conta criada com sucesso! Entrando...';
+      setTimeout(() => {
+        showApp();
+      }, 1000);
+    } catch (err) {
+      registerError.textContent = err.message || 'Erro ao realizar cadastro.';
+    } finally {
+      registerSubmit.disabled = false;
+    }
+  });
+}
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -267,7 +366,7 @@ form.addEventListener("submit", async (event) => {
 
   // Check for Dev commands first
   const devCommand = parseDevCommand(content);
-  
+
   if (devCommand) {
     history.push({ role: "user", content });
     input.value = "";
@@ -284,11 +383,11 @@ form.addEventListener("submit", async (event) => {
       const endpoint = devCommand.action === 'listFiles' ? '/api/dev/files' : '/api/dev/file';
       const param = devCommand.action === 'listFiles' ? 'path' : 'path';
       const url = `${apiBase}${endpoint}?${param}=${encodeURIComponent(devCommand.details.path || '')}`;
-      
+
       try {
         const response = await fetch(url);
         const result = await response.json();
-        
+
         if (result.ok) {
           if (devCommand.action === 'listFiles') {
             assistantMessage.content = `Arquivos encontrados:\n${result.files.map(f => `- ${f.type}: ${f.name}`).join('\n')}`;
@@ -307,20 +406,20 @@ form.addEventListener("submit", async (event) => {
     } else {
       // Actions that may require approval
       const result = await executeDevAction(devCommand.action, devCommand.details);
-      
+
       if (result === null) {
         // Action requires approval, waiting for user
         assistantMessage.content = "Aguardando aprovação do usuário...";
         return;
       }
-      
+
       if (result.ok) {
         assistantMessage.content = "Ação executada com sucesso.";
       } else {
         assistantMessage.content = `Erro ao executar ação: ${result.error}`;
       }
     }
-    
+
     saveHistory();
     render();
     return;
@@ -427,11 +526,16 @@ devModeButton.addEventListener("click", () => {
   history.push({
     role: "assistant",
     content: settings.devMode
-      ? "Modo Dev ativado. Agora posso ajudar a configurar minha personalidade e memoria pelo chat."
+      ? "Modo Dev ativado. Agora posso ajudar a configurar minha personalidade e memoria pelo chat. Você pode usar comandos como:\n- 'criar arquivo caminho/arquivo.js: conteúdo'\n- 'ler arquivo caminho/arquivo.js'\n- 'listar arquivos diretorio'\n- 'executar comando npm install'\n- 'instalar dependência nome-do-pacote'"
       : "Modo Dev desativado. Voltei ao modo normal."
   });
   saveHistory();
   render();
+});
+
+devHistoryButton.addEventListener("click", () => {
+  devHistoryPanel.hidden = false;
+  renderDevHistory();
 });
 
 memoryButton.addEventListener("click", () => {
@@ -483,9 +587,6 @@ messagesEl.addEventListener("click", async (event) => {
 });
 
 function render() {
-  if (typingIndicator && typingIndicator.parentNode) {
-    typingIndicator.parentNode.removeChild(typingIndicator);
-  }
   messagesEl.innerHTML = "";
 
   for (const [index, message] of history.entries()) {
@@ -497,7 +598,7 @@ function render() {
 
     const label = document.createElement("span");
     label.className = "message-label";
-    label.textContent = message.role === "user" ? "Voce" : "Astra";
+    label.textContent = message.role === "user" ? "Voce" : (loadAppSettings().aiName || "Alya");
 
     const content = document.createElement("div");
     content.className = "message-content";
@@ -538,7 +639,7 @@ function render() {
 function setBusy(isBusy) {
   sendButton.disabled = isBusy;
   input.disabled = isBusy;
-  
+
   const statusPill = document.querySelector('.status-pill');
   if (isBusy) {
     statusPill.textContent = 'digitando...';
@@ -652,7 +753,7 @@ function saveConversations() {
 }
 
 function createNewConversation() {
-  const id = Date.now().toString(36) + Math.random().toString(36).substr(2);
+  const id = Date.now().toString(36) + Math.random().toString(36).substring(2);
   const conversation = {
     id,
     title: "Nova conversa",
@@ -708,9 +809,9 @@ function addDevHistory(action, details, status = 'success') {
 
 function showDevApproval(action, details) {
   pendingDevAction = { action, details };
-  
+
   let content = `<p class="warning">${details.warning || 'Esta ação requer sua aprovação.'}</p>`;
-  
+
   if (action === 'writeFile') {
     content += `<p><strong>Arquivo:</strong> <code>${details.path}</code></p>`;
     content += `<p><strong>Conteúdo:</strong></p>`;
@@ -720,14 +821,14 @@ function showDevApproval(action, details) {
   } else if (action === 'installDependency') {
     content += `<p><strong>Pacote:</strong> <code>${escapeHtml(details.package)}</code></p>`;
   }
-  
+
   devApprovalContent.innerHTML = content;
   devApprovalModal.hidden = false;
 }
 
 async function executeDevAction(action, details, approved = false) {
   const endpoint = getDevEndpoint(action);
-  
+
   try {
     const response = await fetch(`${apiBase}${endpoint}`, {
       method: 'POST',
@@ -735,12 +836,12 @@ async function executeDevAction(action, details, approved = false) {
       body: JSON.stringify({ ...details, approved })
     });
     const result = await response.json();
-    
+
     if (result.requiresApproval) {
       showDevApproval(action, result);
       return null;
     }
-    
+
     addDevHistory(action, details, result.ok ? 'success' : 'error');
     return result;
   } catch (error) {
@@ -769,7 +870,7 @@ function escapeHtml(text) {
 
 function parseDevCommand(message) {
   if (!settings.devMode) return null;
-  
+
   const patterns = [
     {
       regex: /(?:criar|editar|modificar)\s+(?:o\s+)?arquivo\s+(.+?):\s*(.+)/is,
@@ -802,7 +903,7 @@ function parseDevCommand(message) {
       extract: (match) => ({ path: match[1].trim() })
     }
   ];
-  
+
   for (const pattern of patterns) {
     const match = message.match(pattern.regex);
     if (match) {
@@ -812,7 +913,7 @@ function parseDevCommand(message) {
       };
     }
   }
-  
+
   return null;
 }
 
@@ -861,35 +962,58 @@ async function loadFileProfile() {
 }
 
 async function boot() {
-  try {
-    const response = await fetch(`${apiBase}/api/auth/status`, { signal: AbortSignal.timeout(10000) });
-    const data = await response.json();
-
-    if (data.protected && !data.authenticated) {
-      loginMode = data.loginMode || "password";
-      syncAccessUI();
-      accessGate.hidden = false;
-      appShell.hidden = true;
-      (loginMode === "users" ? accessUsername : accessPassword).focus();
-      return;
-    }
-  } catch (error) {
-    // If auth status cannot be checked, show a warning but still try to use the app
-    console.warn("Nao foi possivel verificar o status de autenticacao:", error);
-  }
-
   showApp();
 }
 
 function showApp() {
-  accessGate.hidden = true;
-  appShell.hidden = false;
+  if (accessGate) accessGate.hidden = true;
+  if (appShell) appShell.hidden = false;
   renderSidebarConversations();
   updateWelcomeVisibility();
   loadFileProfile();
   render();
   showWelcomeSplash();
 }
+function applyAssistantConfig(assistantMessage) {
+  const configPattern = /\[\[NOVA_CONFIG:({[\s\S]*?})\]\]/;
+  const match = assistantMessage.content.match(configPattern);
+  if (!match) return;
+
+  assistantMessage.content = assistantMessage.content.replace(configPattern, "").trim();
+
+  try {
+    const config = JSON.parse(match[1]);
+    const updates = [];
+
+    if (["equilibrada", "direta", "amiga", "tecnica", "jarvis"].includes(config.personality)) {
+      settings.personality = config.personality;
+      personalitySelect.value = config.personality;
+      updates.push(`personalidade: ${labelPersonality(config.personality)}`);
+    }
+
+    if (typeof config.memoryAppend === "string" && config.memoryAppend.trim()) {
+      const addition = config.memoryAppend.trim().slice(0, 500);
+      settings.memory = [settings.memory, addition].filter(Boolean).join("\n").slice(0, 2000);
+      memoryInput.value = settings.memory;
+      updates.push("memoria atualizada");
+    }
+
+    if (typeof config.memoryReplace === "string") {
+      settings.memory = config.memoryReplace.trim().slice(0, 2000);
+      memoryInput.value = settings.memory;
+      updates.push("memoria substituida");
+    }
+
+    saveSettings();
+
+    if (updates.length > 0) {
+      assistantMessage.content += `\n\nConfiguracao aplicada: ${updates.join(", ")}.`;
+    }
+  } catch {
+    assistantMessage.content += "\n\nNao consegui aplicar a configuracao automaticamente.";
+  }
+}
+
 function prepareFileProfileEdit(assistantMessage) {
   const configPattern = /\[\[NOVA_PROFILE_FILE:({[\s\S]*?})\]\]/;
   const match = assistantMessage.content.match(configPattern);
@@ -900,7 +1024,7 @@ function prepareFileProfileEdit(assistantMessage) {
   try {
     const config = JSON.parse(match[1]);
     const profile = {
-      name: "Astra",
+      name: "Alya",
       personality: settings.personality,
       memory: settings.memory
     };
@@ -1035,15 +1159,15 @@ function exportConversation() {
     case 'json':
       content = JSON.stringify(history, null, 2);
       mimeType = 'application/json';
-      filename = `conversa-astra-${stamp}.json`;
+      filename = `conversa-alya-${stamp}.json`;
       break;
     case 'md':
       content = history.map((message) => {
-        const label = message.role === "user" ? "### Você" : "### Astra";
+        const label = message.role === "user" ? "### Você" : "### " + (loadAppSettings().aiName || "Alya");
         return `${label}\n\n${message.content}\n\n---`;
       }).join('\n');
       mimeType = 'text/markdown';
-      filename = `conversa-astra-${stamp}.md`;
+      filename = `conversa-alya-${stamp}.md`;
       break;
     case 'pdf':
       exportToPDF(stamp);
@@ -1051,11 +1175,11 @@ function exportConversation() {
     case 'txt':
     default:
       content = history.map((message) => {
-        const label = message.role === "user" ? "Voce" : "Astra";
+        const label = message.role === "user" ? "Voce" : (loadAppSettings().aiName || "Alya");
         return `${label}: ${message.content}`;
       }).join('\n\n');
       mimeType = 'text/plain';
-      filename = `conversa-astra-${stamp}.txt`;
+      filename = `conversa-alya-${stamp}.txt`;
   }
 
   const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
@@ -1073,24 +1197,24 @@ function exportConversation() {
 function exportToPDF(stamp) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
-  
+
   let y = 20;
   doc.setFontSize(16);
-  doc.text('Conversa com Astra', 20, y);
+  doc.text('Conversa com ' + (loadAppSettings().aiName || 'Alya'), 20, y);
   y += 15;
-  
+
   doc.setFontSize(12);
   history.forEach((message) => {
     if (y > 270) {
       doc.addPage();
       y = 20;
     }
-    
-    const label = message.role === "user" ? "Você:" : "Astra:";
+
+    const label = message.role === "user" ? "Você:" : (loadAppSettings().aiName || "Alya") + ":";
     doc.setFont(undefined, 'bold');
     doc.text(label, 20, y);
     y += 7;
-    
+
     doc.setFont(undefined, 'normal');
     const lines = doc.splitTextToSize(message.content, 170);
     lines.forEach((line) => {
@@ -1103,8 +1227,8 @@ function exportToPDF(stamp) {
     });
     y += 5;
   });
-  
-  doc.save(`conversa-astra-${stamp}.pdf`);
+
+  doc.save(`conversa-alya-${stamp}.pdf`);
 }
 
 // WhatsApp approval system
@@ -1179,7 +1303,7 @@ function openSettings() {
   if (!settingsModal) return;
   const appSettings = loadAppSettings();
   if (settingsLanguage) settingsLanguage.value = appSettings.language || "pt-BR";
-  if (settingsAiName) settingsAiName.value = appSettings.aiName || "Astra";
+  if (settingsAiName) settingsAiName.value = appSettings.aiName || "Alya";
   if (settingsUserName) settingsUserName.value = appSettings.userName || getUserName();
   if (settingsWelcomeToggle) settingsWelcomeToggle.checked = getWelcomeEnabled();
   if (settingsSoundToggle) settingsSoundToggle.checked = appSettings.soundEnabled !== false;
@@ -1199,7 +1323,7 @@ function switchSettingsTab(tabId) {
 function applySettings() {
   const updates = {
     language: settingsLanguage?.value || "pt-BR",
-    aiName: settingsAiName?.value?.trim() || "Astra",
+    aiName: settingsAiName?.value?.trim() || "Alya",
     userName: settingsUserName?.value?.trim() || "Pedro",
     welcomeEnabled: settingsWelcomeToggle?.checked ?? true,
     soundEnabled: settingsSoundToggle?.checked ?? true
@@ -1262,7 +1386,7 @@ searchInput.addEventListener("input", () => {
     return;
   }
 
-  const results = history.filter((message) => 
+  const results = history.filter((message) =>
     message.content.toLowerCase().includes(query)
   );
 
@@ -1273,7 +1397,7 @@ searchInput.addEventListener("input", () => {
 
   searchResults.innerHTML = results.map((message, index) => `
     <div class="search-result">
-      <span class="search-role">${message.role === 'user' ? 'Você' : 'Astra'}:</span>
+      <span class="search-role">${message.role === 'user' ? 'Você' : (loadAppSettings().aiName || 'Alya')}:</span>
       <p class="search-content">${message.content.slice(0, 200)}${message.content.length > 200 ? '...' : ''}</p>
     </div>
   `).join('');
@@ -1406,10 +1530,10 @@ function switchConversation(conversationId) {
 
 function deleteConversation(conversationId) {
   if (!confirm('Tem certeza que deseja excluir esta conversa?')) return;
-  
+
   conversations = conversations.filter(c => c.id !== conversationId);
   saveConversations();
-  
+
   if (currentConversationId === conversationId) {
     if (conversations.length > 0) {
       currentConversationId = conversations[0].id;
@@ -1417,7 +1541,7 @@ function deleteConversation(conversationId) {
       currentConversationId = createNewConversation();
     }
   }
-  
+
   renderConversationsList();
   renderSidebarConversations();
 }
@@ -1797,7 +1921,7 @@ searchConversationsInput.addEventListener("input", () => {
   }
 
   const filtered = conversations.filter(c => c.title.toLowerCase().includes(query));
-  
+
   if (filtered.length === 0) {
     sidebarConversationsList.innerHTML = '<p class="whatsapp-empty">Nenhuma conversa encontrada.</p>';
     return;
@@ -1842,15 +1966,7 @@ document.querySelectorAll('.welcome-card').forEach(card => {
   });
 });
 
-function showApp() {
-  accessGate.hidden = true;
-  appShell.hidden = false;
-  renderSidebarConversations();
-  updateWelcomeVisibility();
-  loadFileProfile();
-  render();
-  showWelcomeSplash();
-}
+
 
 function updateWelcomeVisibility() {
   if (welcomeScreen) {
@@ -1896,6 +2012,752 @@ document.addEventListener("keydown", (event) => {
 helpButton = document.querySelector("#helpButton");
 if (helpButton) {
   helpButton.addEventListener("click", () => {
-    alert("Astra - Assistente IA\n\nRecursos:\n- Chat com IA\n- Memoria persistente\n- Modo Dev\n- Integracao WhatsApp\n- Integracao Discord\n- Exportacao de conversas\n\nUse os botoes no topo para acessar as funcionalidades.");
+    alert("Alya - Assistente IA\n\nRecursos:\n- Chat com IA\n- Memoria persistente\n- Modo Dev\n- Integracao WhatsApp\n- Integracao Discord\n- Exportacao de conversas\n\nUse os botoes no topo para acessar as funcionalidades.");
   });
 }
+
+// --- DEV PANEL IMPLEMENTATION ---
+let devCurrentPath = "";
+let devEditingFile = "";
+
+// 1. Toggle visibility and load root folder
+if (devPanelButton) {
+  devPanelButton.addEventListener("click", () => {
+    devCurrentPath = "";
+    devEditingFile = "";
+    devPanelModal.hidden = false;
+    loadDevFolder("");
+    loadDevBackups();
+  });
+}
+
+if (closeDevPanelButton) {
+  closeDevPanelButton.addEventListener("click", () => {
+    devPanelModal.hidden = true;
+  });
+}
+
+if (devPanelModal) {
+  devPanelModal.addEventListener("click", (event) => {
+    if (event.target === devPanelModal) {
+      devPanelModal.hidden = true;
+    }
+  });
+}
+
+// Wire history button click listener
+if (devHistoryButton) {
+  devHistoryButton.addEventListener("click", () => {
+    renderDevHistory();
+    devHistoryPanel.hidden = false;
+  });
+}
+
+// 2. Load folders using API
+async function loadDevFolder(subPath) {
+  try {
+    devFilesList.innerHTML = '<p class="whatsapp-empty">Carregando...</p>';
+    const url = `${apiBase}/api/dev/files?path=${encodeURIComponent(subPath)}`;
+    const response = await fetch(url);
+    const result = await response.json();
+
+    if (result.ok) {
+      devCurrentPath = subPath || "";
+      devCurrentDir.textContent = devCurrentPath || "/ (raiz)";
+
+      if (result.files.length === 0) {
+        devFilesList.innerHTML = '<p class="whatsapp-empty">Pasta vazia.</p>';
+        return;
+      }
+
+      devFilesList.innerHTML = result.files.map(file => `
+        <div class="dev-file-item ${file.path === devEditingFile ? 'active' : ''}" data-path="${file.path}" data-type="${file.type}">
+          <span class="icon">${file.type === 'directory' ? '📁' : '📄'}</span>
+          <span class="name">${file.name}</span>
+        </div>
+      `).join('');
+
+      // Wire click events
+      devFilesList.querySelectorAll('.dev-file-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const path = item.dataset.path;
+          const type = item.dataset.type;
+          if (type === 'directory') {
+            loadDevFolder(path);
+          } else {
+            openDevFile(path);
+          }
+        });
+      });
+    } else {
+      devFilesList.innerHTML = `<p class="access-error">Erro: ${result.error}</p>`;
+    }
+  } catch (error) {
+    devFilesList.innerHTML = `<p class="access-error">Erro ao listar: ${error.message}</p>`;
+  }
+}
+
+// Nav back to parent folder
+if (devParentDirButton) {
+  devParentDirButton.addEventListener("click", () => {
+    if (!devCurrentPath) return; // Already at root
+    const parts = devCurrentPath.split(/[\/\\]/);
+    parts.pop();
+    const parentPath = parts.join('/');
+    loadDevFolder(parentPath);
+  });
+}
+
+// 3. Open file in editor
+async function openDevFile(filePath) {
+  try {
+    devCodeEditor.placeholder = "Carregando arquivo...";
+    devCodeEditor.value = "";
+    devCodeEditor.disabled = true;
+    devSaveFileButton.disabled = true;
+
+    // Toggle active state in sidebar
+    devFilesList.querySelectorAll('.dev-file-item').forEach(item => {
+      item.classList.toggle('active', item.dataset.path === filePath);
+    });
+
+    const url = `${apiBase}/api/dev/file?path=${encodeURIComponent(filePath)}`;
+    const response = await fetch(url);
+    const result = await response.json();
+
+    if (result.ok) {
+      devEditingFile = filePath;
+      devEditingFilePath.textContent = filePath;
+      devCodeEditor.value = result.content;
+      devCodeEditor.disabled = false;
+      devSaveFileButton.disabled = false;
+
+      // Switch tab to editor
+      switchDevTab("editor");
+    } else {
+      alert("Erro ao ler arquivo: " + result.error);
+      devEditingFilePath.textContent = "Erro ao carregar";
+    }
+  } catch (error) {
+    alert("Erro ao abrir arquivo: " + error.message);
+  }
+}
+
+// 4. Save file
+if (devSaveFileButton) {
+  devSaveFileButton.addEventListener("click", async () => {
+    if (!devEditingFile) return;
+
+    try {
+      devSaveFileButton.disabled = true;
+      devSaveFileButton.textContent = "Salvando...";
+
+      const response = await fetch(`${apiBase}/api/dev/file`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          path: devEditingFile,
+          content: devCodeEditor.value
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.ok) {
+        alert("Arquivo salvo com sucesso!");
+      } else if (result.requiresApproval) {
+        // Show file approval modal
+        filePreview.textContent = devCodeEditor.value;
+        pendingDevAction = {
+          action: 'writeFile',
+          details: { path: devEditingFile, content: devCodeEditor.value }
+        };
+        fileApprovalModal.hidden = false;
+      } else {
+        alert("Erro ao salvar: " + result.error);
+      }
+    } catch (error) {
+      alert("Erro de conexão: " + error.message);
+    } finally {
+      devSaveFileButton.disabled = false;
+      devSaveFileButton.textContent = "Salvar";
+    }
+  });
+}
+
+// New File and Folder creation
+if (devNewFileButton) {
+  devNewFileButton.addEventListener("click", async () => {
+    const filename = prompt("Digite o nome do novo arquivo:");
+    if (!filename) return;
+    const newPath = devCurrentPath ? `${devCurrentPath}/${filename}` : filename;
+    try {
+      const response = await fetch(`${apiBase}/api/dev/file`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: newPath, content: "" })
+      });
+      const result = await response.json();
+      if (result.ok) {
+        loadDevFolder(devCurrentPath);
+        openDevFile(newPath);
+      } else {
+        alert("Erro ao criar arquivo: " + result.error);
+      }
+    } catch (error) {
+      alert("Erro ao criar arquivo: " + error.message);
+    }
+  });
+}
+
+if (devNewFolderButton) {
+  devNewFolderButton.addEventListener("click", () => {
+    alert("Para criar uma pasta, basta criar um arquivo dentro dela (ex: pasta/arquivo.txt). O servidor criará os diretórios necessários automaticamente!");
+  });
+}
+
+// 5. Console Command Execution
+if (devConsoleForm) {
+  devConsoleForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const command = devConsoleInput.value.trim();
+    if (!command) return;
+
+    appendTerminal(`$ ${command}\n`);
+    devConsoleInput.value = "";
+    devConsoleSubmit.disabled = true;
+
+    try {
+      const response = await fetch(`${apiBase}/api/dev/command`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command })
+      });
+      const result = await response.json();
+
+      if (result.ok) {
+        appendTerminal(result.output || "(Comando executado sem retorno)\n");
+      } else if (result.requiresApproval) {
+        appendTerminal("⚠️ Comando requer aprovação. Verifique a tela principal.\n");
+        // Show approval modal
+        showDevApproval("executeCommand", { command });
+      } else {
+        appendTerminal(`❌ Erro: ${result.error}\n${result.output || ''}\n`);
+      }
+    } catch (error) {
+      appendTerminal(`❌ Erro de conexão: ${error.message}\n`);
+    } finally {
+      devConsoleSubmit.disabled = false;
+    }
+  });
+}
+
+function appendTerminal(text) {
+  devTerminalOutput.textContent += text;
+  // Auto scroll
+  const container = document.querySelector(".dev-terminal-container");
+  if (container) container.scrollTop = container.scrollHeight;
+}
+
+// Command shortcuts
+devConsoleShortcuts.forEach(btn => {
+  btn.addEventListener("click", () => {
+    const cmd = btn.dataset.cmd;
+    if (cmd) {
+      devConsoleInput.value = cmd;
+      devConsoleInput.focus();
+    }
+  });
+});
+
+// 6. Backups Management
+if (devCreateBackupButton) {
+  devCreateBackupButton.addEventListener("click", async () => {
+    if (!devEditingFile) {
+      alert("Selecione um arquivo primeiro para fazer backup.");
+      return;
+    }
+
+    try {
+      devCreateBackupButton.disabled = true;
+      devCreateBackupButton.textContent = "Criando...";
+      const response = await fetch(`${apiBase}/api/dev/backup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: devEditingFile })
+      });
+      const result = await response.json();
+      if (result.ok) {
+        alert(`Backup criado: ${result.backupPath}`);
+        loadDevBackups();
+      } else {
+        alert("Erro ao criar backup: " + result.error);
+      }
+    } catch (error) {
+      alert("Erro: " + error.message);
+    } finally {
+      devCreateBackupButton.disabled = false;
+      devCreateBackupButton.textContent = "Criar Backup do Projeto";
+    }
+  });
+}
+
+async function loadDevBackups() {
+  try {
+    devBackupsList.innerHTML = '<p class="whatsapp-empty">Carregando backups...</p>';
+    const url = `${apiBase}/api/dev/files?path=${encodeURIComponent('nova-data/backups')}`;
+    const response = await fetch(url);
+    const result = await response.json();
+
+    if (result.ok && result.files) {
+      const backups = result.files.filter(f => f.type === 'file');
+      if (backups.length === 0) {
+        devBackupsList.innerHTML = '<p class="whatsapp-empty">Nenhum backup disponível.</p>';
+        return;
+      }
+
+      devBackupsList.innerHTML = backups.map(file => `
+        <div class="dev-backup-item">
+          <span class="dev-backup-name">${file.name}</span>
+          <button class="tool-button dev-backup-restore-btn" data-path="${file.path}" type="button">Restaurar</button>
+        </div>
+      `).join('');
+
+      devBackupsList.querySelectorAll('.dev-backup-restore-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const backupPath = btn.dataset.path;
+          const original = prompt("Digite o caminho relativo do arquivo original para restaurar (ex: nova-data/profile.json):");
+          if (!original) return;
+
+          try {
+            const response = await fetch(`${apiBase}/api/dev/restore`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ backupPath, originalPath: original })
+            });
+            const result = await response.json();
+            if (result.ok) {
+              alert("Backup restaurado com sucesso!");
+              loadDevFolder(devCurrentPath);
+            } else {
+              alert("Erro ao restaurar: " + result.error);
+            }
+          } catch (error) {
+            alert("Erro: " + error.message);
+          }
+        });
+      });
+    } else {
+      devBackupsList.innerHTML = '<p class="whatsapp-empty">Erro ao carregar backups.</p>';
+    }
+  } catch (error) {
+    devBackupsList.innerHTML = `<p class="whatsapp-empty">Erro: ${error.message}</p>`;
+  }
+}
+
+// 8. Users Management
+const usersButton = document.getElementById("usersButton");
+const usersModal = document.getElementById("usersModal");
+const closeUsersButton = document.getElementById("closeUsersButton");
+const createUserForm = document.getElementById("createUserForm");
+const usersList = document.getElementById("usersList");
+
+if (usersButton) {
+  usersButton.addEventListener("click", async () => {
+    usersModal.hidden = false;
+    await loadUsers();
+  });
+}
+
+if (closeUsersButton) {
+  closeUsersButton.addEventListener("click", () => {
+    usersModal.hidden = true;
+  });
+}
+
+if (createUserForm) {
+  createUserForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const username = document.getElementById("newUsername").value.trim();
+    const password = document.getElementById("newPassword").value;
+
+    if (!username || !password) {
+      alert("Nome de usuário e senha são obrigatórios");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${apiBase}/api/users/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await response.json();
+
+      if (data.ok) {
+        document.getElementById("newUsername").value = "";
+        document.getElementById("newPassword").value = "";
+        await loadUsers();
+        alert("Usuário criado com sucesso!");
+      } else {
+        alert(`Erro: ${data.error}`);
+      }
+    } catch (error) {
+      alert("Erro ao criar usuário");
+    }
+  });
+}
+
+async function loadUsers() {
+  try {
+    const response = await fetch(`${apiBase}/api/users/list`);
+    const data = await response.json();
+
+    if (data.users && data.users.length > 0) {
+      usersList.innerHTML = data.users.map(user => `
+        <div class="user-item">
+          <span class="user-name">${user.username}</span>
+          <span class="user-created">Criado em: ${new Date(user.createdAt).toLocaleDateString('pt-BR')}</span>
+          <button class="tool-button delete-user-btn" data-username="${user.username}">Remover</button>
+        </div>
+      `).join('');
+
+      // Add event listeners to delete buttons
+      document.querySelectorAll(".delete-user-btn").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const username = btn.dataset.username;
+          if (confirm(`Tem certeza que deseja remover o usuário ${username}?`)) {
+            await deleteUser(username);
+          }
+        });
+      });
+    } else {
+      usersList.innerHTML = `<p class="whatsapp-empty">Nenhum usuário cadalyado</p>`;
+    }
+  } catch (error) {
+    usersList.innerHTML = `<p class="whatsapp-empty">Erro ao carregar usuários</p>`;
+  }
+}
+
+async function deleteUser(username) {
+  try {
+    const response = await fetch(`${apiBase}/api/users/delete`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username })
+    });
+    const data = await response.json();
+
+    if (data.ok) {
+      await loadUsers();
+      alert("Usuário removido com sucesso!");
+    } else {
+      alert(`Erro: ${data.error}`);
+    }
+  } catch (error) {
+    alert("Erro ao remover usuário");
+  }
+}
+
+// 9. Tabs switching logic
+devTabs.forEach(tab => {
+  tab.addEventListener("click", () => {
+    const tabId = tab.dataset.devTab;
+    switchDevTab(tabId);
+  });
+});
+
+function switchDevTab(tabId) {
+  devTabs.forEach(btn => btn.classList.toggle("active", btn.dataset.devTab === tabId));
+  devTabPanes.forEach(pane => {
+    const isTarget = pane.id === `devTab${tabId.charAt(0).toUpperCase() + tabId.slice(1)}`;
+    pane.style.display = isTarget ? "flex" : "none";
+  });
+}
+
+// 8. Public Link Sharing Fetching
+async function initShareLink() {
+  if (!shareLinkButton) return;
+  shareLinkButton.style.display = "inline-flex";
+
+  shareLinkButton.addEventListener("click", async () => {
+    const originalText = shareLinkButton.innerHTML;
+    shareLinkButton.innerHTML = "⏳ Obtendo link...";
+    shareLinkButton.disabled = true;
+
+    try {
+      // Primeiro tenta pegar o link atual
+      let response = await fetch(`${apiBase}/api/aly-link`);
+      let data = await response.json();
+
+      // Se o link é local (túnel caiu), tenta reiniciar
+      if (data.local) {
+        shareLinkButton.innerHTML = "🔄 Reconectando túnel...";
+        const restartRes = await fetch(`${apiBase}/api/tunnel-restart`, { method: 'POST' });
+        const restartData = await restartRes.json();
+        if (restartData.success) {
+          data = { chatUrl: restartData.chatUrl };
+        } else {
+          shareLinkButton.innerHTML = "⚠️ Túnel indisponível";
+          setTimeout(() => { shareLinkButton.innerHTML = originalText; shareLinkButton.disabled = false; }, 3000);
+          return;
+        }
+      }
+
+      if (data.chatUrl) {
+        await navigator.clipboard.writeText(data.chatUrl);
+        shareLinkButton.innerHTML = "✅ Link copiado!";
+        setTimeout(() => { shareLinkButton.innerHTML = originalText; shareLinkButton.disabled = false; }, 2000);
+      } else {
+        shareLinkButton.innerHTML = "⚠️ Sem link público";
+        setTimeout(() => { shareLinkButton.innerHTML = originalText; shareLinkButton.disabled = false; }, 3000);
+      }
+    } catch (err) {
+      console.error("Share link error:", err);
+      shareLinkButton.innerHTML = "❌ Erro";
+      setTimeout(() => { shareLinkButton.innerHTML = originalText; shareLinkButton.disabled = false; }, 3000);
+    }
+  });
+}
+
+// Run public link checker on boot
+initShareLink();
+
+/* ══════════════════════════════════════════════════════════
+   SISTEMA DE NOTIFICAÇÕES EXCLUSIVO DA ALYA PRIVADA (FRONTEND)
+   ══════════════════════════════════════════════════════════ */
+
+const notificationBellBtn = document.getElementById('notificationBellButton');
+const notificationBadge = document.getElementById('notificationBadge');
+const notificationOverlay = document.getElementById('notificationOverlay');
+const closeNotifDrawerBtn = document.getElementById('closeNotificationDrawer');
+const unreadCountPill = document.getElementById('unreadCountPill');
+const notificationsList = document.getElementById('notificationsList');
+const notifSearchInput = document.getElementById('notificationSearchInput');
+const notifCategoryFilter = document.getElementById('notifCategoryFilter');
+const notifPriorityFilter = document.getElementById('notifPriorityFilter');
+const markAllReadBtn = document.getElementById('markAllReadBtn');
+const clearAllNotifsBtn = document.getElementById('clearAllNotifsBtn');
+const toastContainer = document.getElementById('toastContainer');
+
+let allNotifications = [];
+let knownNotifIds = new Set();
+let isFirstNotifLoad = true;
+
+// Alternar Painel Lateral
+if (notificationBellBtn && notificationOverlay) {
+  notificationBellBtn.addEventListener('click', () => {
+    notificationOverlay.hidden = false;
+    fetchNotifications();
+  });
+
+  closeNotifDrawerBtn.addEventListener('click', () => {
+    notificationOverlay.hidden = true;
+  });
+
+  notificationOverlay.addEventListener('click', (e) => {
+    if (e.target === notificationOverlay) {
+      notificationOverlay.hidden = true;
+    }
+  });
+}
+
+// Filtros & Buscas
+if (notifSearchInput) notifSearchInput.addEventListener('input', applyNotifFilters);
+if (notifCategoryFilter) notifCategoryFilter.addEventListener('change', applyNotifFilters);
+if (notifPriorityFilter) notifPriorityFilter.addEventListener('change', applyNotifFilters);
+
+// Ações Globais
+if (markAllReadBtn) {
+  markAllReadBtn.addEventListener('click', async () => {
+    try {
+      const res = await fetch(`${apiBase}/api/notifications/mark-read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: 'ALL' })
+      });
+      const data = await res.json();
+      if (data.notifications) {
+        allNotifications = data.notifications;
+        updateNotifUI(data.unreadCount);
+        applyNotifFilters();
+      }
+    } catch (err) {
+      console.error('Erro ao marcar todas como lidas:', err);
+    }
+  });
+}
+
+if (clearAllNotifsBtn) {
+  clearAllNotifsBtn.addEventListener('click', async () => {
+    if (!confirm('Deseja realmente apagar todas as notificações?')) return;
+    try {
+      const res = await fetch(`${apiBase}/api/notifications`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: 'ALL' })
+      });
+      const data = await res.json();
+      if (data.notifications) {
+        allNotifications = data.notifications;
+        updateNotifUI(data.unreadCount);
+        applyNotifFilters();
+      }
+    } catch (err) {
+      console.error('Erro ao limpar notificações:', err);
+    }
+  });
+}
+
+// Buscar Notificações do Servidor
+async function fetchNotifications() {
+  try {
+    const res = await fetch(`${apiBase}/api/notifications`);
+    if (!res.ok) return;
+
+    const data = await res.json();
+    const newItems = data.notifications || [];
+    const unread = data.unreadCount || 0;
+
+    // Detectar novos itens para Toast Popup
+    if (!isFirstNotifLoad) {
+      newItems.forEach(item => {
+        if (!knownNotifIds.has(item.id) && !item.read) {
+          showNotifToast(item);
+        }
+      });
+    }
+
+    knownNotifIds = new Set(newItems.map(i => i.id));
+    allNotifications = newItems;
+    isFirstNotifLoad = false;
+
+    updateNotifUI(unread);
+    applyNotifFilters();
+  } catch (err) {
+    console.warn('Erro ao buscar notificações:', err.message);
+  }
+}
+
+function updateNotifUI(unreadCount) {
+  if (notificationBadge) {
+    notificationBadge.textContent = unreadCount;
+    notificationBadge.hidden = unreadCount === 0;
+  }
+  if (unreadCountPill) {
+    unreadCountPill.textContent = `${unreadCount} não lida${unreadCount === 1 ? '' : 's'}`;
+  }
+}
+
+function applyNotifFilters() {
+  if (!notificationsList) return;
+
+  const query = (notifSearchInput?.value || '').toLowerCase().trim();
+  const catFilter = notifCategoryFilter?.value || 'ALL';
+  const prioFilter = notifPriorityFilter?.value || 'ALL';
+
+  const filtered = allNotifications.filter(item => {
+    const matchesSearch = !query ||
+      item.title.toLowerCase().includes(query) ||
+      item.message.toLowerCase().includes(query) ||
+      (item.details && item.details.toLowerCase().includes(query));
+
+    const matchesCat = catFilter === 'ALL' || item.category === catFilter;
+    const matchesPrio = prioFilter === 'ALL' || item.priority === prioFilter;
+
+    return matchesSearch && matchesCat && matchesPrio;
+  });
+
+  renderNotifList(filtered);
+}
+
+function renderNotifList(items) {
+  if (!notificationsList) return;
+
+  if (items.length === 0) {
+    notificationsList.innerHTML = '<p class="whatsapp-empty">Nenhuma notificação encontrada.</p>';
+    return;
+  }
+
+  notificationsList.innerHTML = items.map(item => {
+    const catClass = `cat-${item.category.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+    const prioClass = `priority-${item.priority.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+    const timeStr = new Date(item.createdAt).toLocaleString('pt-BR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+
+    return `
+      <div class="notif-card ${item.read ? 'read' : 'unread'} ${prioClass}" data-id="${item.id}">
+        <div class="notif-card-header">
+          <div class="notif-tags">
+            <span class="notif-tag ${catClass}">${item.category}</span>
+            <span class="notif-tag" style="background: rgba(255,255,255,0.06); color: var(--muted);">${item.priority}</span>
+          </div>
+          <span class="notif-time">${timeStr}</span>
+        </div>
+        <h4 class="notif-card-title">${escapeNotif(item.title)}</h4>
+        <p class="notif-card-msg">${escapeNotif(item.message)}</p>
+        ${item.details ? `<p class="notif-card-msg" style="font-family: var(--font-code); font-size: 0.75rem; opacity: 0.8;">${escapeNotif(item.details)}</p>` : ''}
+        <div class="notif-card-actions">
+          ${!item.read ? `<button class="notif-item-btn btn-read" data-id="${item.id}">✓ Lida</button>` : ''}
+          <button class="notif-item-btn btn-del" data-id="${item.id}">🗑️ Excluir</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Wire click handlers for card actions
+  notificationsList.querySelectorAll('.btn-read').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      await fetch(`${apiBase}/api/notifications/mark-read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      fetchNotifications();
+    });
+  });
+
+  notificationsList.querySelectorAll('.btn-del').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      await fetch(`${apiBase}/api/notifications`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      fetchNotifications();
+    });
+  });
+}
+
+function showNotifToast(item) {
+  if (!toastContainer) return;
+
+  const prioClass = `priority-${item.priority.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+  const toast = document.createElement('div');
+  toast.className = `toast-item ${prioClass}`;
+  toast.innerHTML = `
+    <div class="toast-title">🔔 ${escapeNotif(item.title)}</div>
+    <div class="toast-msg">${escapeNotif(item.message)}</div>
+  `;
+
+  toastContainer.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(100%)';
+    toast.style.transition = 'all 0.3s ease';
+    setTimeout(() => toast.remove(), 300);
+  }, 6000);
+}
+
+function escapeNotif(text) {
+  return String(text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Boot notification poller (every 10 seconds)
+fetchNotifications();
+setInterval(fetchNotifications, 10000);
+

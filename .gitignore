@@ -1,6 +1,10 @@
-.env
+.env*
+!.env.example
 node_modules/
 *.log
-nova-data/backups/
+nova-data/
+tools/
+ddg_lite.html
+*.zip
 .DS_Store
 Thumbs.db

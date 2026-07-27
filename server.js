@@ -3,9 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const cors = require('cors');
+const { spawn } = require('child_process');
 
 const logger = require('./lib/logger');
-const { isAuthenticated, hasSitePassword, validateLogin, setAuthCookie, clearAuthCookie, readSiteUsers } = require('./lib/auth');
+const { isAuthenticated, hasSitePassword, validateLogin, setAuthCookie, clearAuthCookie, readSiteUsers, authCookieName } = require('./lib/auth');
 const { askAssistant, askAssistantStream, normalizeSettings } = require('./lib/chat');
 const { handleWhatsappReceive, handleWhatsappApprove, handleWhatsappCancel, getWhatsappQueue, readWhatsappLog } = require('./lib/whatsapp');
 const { DiscordManager } = require('./lib/discord');
@@ -15,11 +16,177 @@ const { readDevProfile, handleApplyProfile, rotateBackups } = require('./lib/pro
 const { saveConversationHistory, loadConversationHistory, deleteConversationHistory, listAllConversations } = require('./lib/history');
 const { listFiles, readFile, writeFile, executeCommand, installDependency, createBackup, restoreBackup } = require('./lib/fileOps');
 const memory = require('./lib/memory');
+const pluginManager = require('./lib/plugins');
+const { searchWeb, shouldSearchWeb } = require('./lib/webSearch');
 const { apiLimiter, authLimiter } = require('./lib/rateLimit');
+const { createUser, deleteUser, listUsers, getUser } = require('./lib/users');
+const notifications = require('./lib/notifications');
+const computerControl = require('./lib/computerControl');
 
 const root = __dirname;
 const publicDir = path.join(root, 'public');
 const port = Number(process.env.PORT || 3000);
+
+let publicTunnelUrl = '';
+let cloudflaredProcess = null;
+let tunnelStartAttempts = 0;
+const TUNNEL_MAX_ATTEMPTS = 10;
+let tunnelReconnectTimer = null;
+
+function getCloudflaredPath() {
+  const platform = process.platform;
+  if (platform === 'win32') {
+    return path.join(root, 'tools', 'cloudflared.exe');
+  }
+  return path.join(root, 'tools', 'cloudflared');
+}
+
+function ensureCloudflaredExists() {
+  const tunnelPath = getCloudflaredPath();
+  if (fs.existsSync(tunnelPath)) {
+    return tunnelPath;
+  }
+
+  logger.warn('cloudflared not found at', tunnelPath);
+  return null;
+}
+
+function startCloudflareTunnel() {
+  if (publicTunnelUrl) {
+    logger.info('Cloudflare Tunnel already running at', publicTunnelUrl);
+    return;
+  }
+
+  const tunnelPath = ensureCloudflaredExists();
+  if (!tunnelPath) {
+    logger.warn('Cloudflare Tunnel skipped: cloudflared not available.');
+    return;
+  }
+
+  tunnelStartAttempts += 1;
+  if (tunnelStartAttempts > TUNNEL_MAX_ATTEMPTS) {
+    logger.warn('Cloudflare Tunnel max attempts reached.');
+    return;
+  }
+
+  logger.info('Starting Cloudflare Tunnel...');
+
+  const args = ['tunnel', '--url', `http://localhost:${port}`];
+  cloudflaredProcess = spawn(tunnelPath, args, {
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+
+  cloudflaredProcess.stdout.on('data', (data) => {
+    const text = data.toString();
+    const match = text.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
+    if (match && match[0] !== publicTunnelUrl) {
+      publicTunnelUrl = match[0];
+      tunnelStartAttempts = 0;
+      logger.info(`Cloudflare Tunnel ready at ${publicTunnelUrl}`);
+    }
+  });
+
+  cloudflaredProcess.stderr.on('data', (data) => {
+    const text = data.toString();
+    const match = text.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
+    if (match && match[0] !== publicTunnelUrl) {
+      publicTunnelUrl = match[0];
+      tunnelStartAttempts = 0;
+      logger.info(`Cloudflare Tunnel ready at ${publicTunnelUrl}`);
+    }
+  });
+
+  cloudflaredProcess.on('error', (error) => {
+    logger.error('Cloudflare Tunnel error:', error);
+    cloudflaredProcess = null;
+    publicTunnelUrl = '';
+  });
+
+  cloudflaredProcess.on('exit', (code, signal) => {
+    logger.warn('Cloudflare Tunnel exited with code', code, 'signal', signal);
+    cloudflaredProcess = null;
+    publicTunnelUrl = '';
+    // Reconexão automática com delay progressivo
+    const delay = Math.min(tunnelStartAttempts * 5000, 30000) || 5000;
+    logger.info(`Tentando reconectar o túnel em ${delay / 1000}s...`);
+    if (tunnelReconnectTimer) clearTimeout(tunnelReconnectTimer);
+    tunnelReconnectTimer = setTimeout(() => {
+      tunnelReconnectTimer = null;
+      startCloudflareTunnel();
+    }, delay);
+  });
+}
+
+function stopCloudflareTunnel() {
+  if (tunnelReconnectTimer) {
+    clearTimeout(tunnelReconnectTimer);
+    tunnelReconnectTimer = null;
+  }
+  if (cloudflaredProcess) {
+    cloudflaredProcess.kill('SIGTERM');
+    cloudflaredProcess = null;
+    publicTunnelUrl = '';
+  }
+}
+
+async function handleAlyLink(req, res) {
+  const alyBase = publicTunnelUrl || `http://localhost:${port}`;
+  const chatUrl = `${alyBase}/aly`;
+  const apiUrl = `${alyBase}/api/aly-chat`;
+  sendJson(res, 200, {
+    publicUrl: alyBase,
+    chatUrl,
+    apiUrl,
+    local: !publicTunnelUrl
+  });
+}
+
+async function handleAlyStatus(req, res) {
+  sendJson(res, 200, {
+    tunnelUp: Boolean(publicTunnelUrl),
+    publicUrl: publicTunnelUrl || null,
+    localUrl: `http://localhost:${port}`
+  });
+}
+
+async function handleAlyImage(req, res) {
+  const body = await readJsonBody(req);
+  const prompt = String(body.prompt || '').trim().replace(/\s+/g, ' ').slice(0, 600);
+  const imageType = ['avatar', 'banner', 'personagem'].includes(body.type) ? body.type : 'personagem';
+
+  if (!prompt) {
+    throw new UserFacingError('Descreva a imagem que você quer criar.', 400);
+  }
+
+  const formats = {
+    avatar: { width: 1024, height: 1024, label: 'foto de perfil quadrada' },
+    banner: { width: 1536, height: 768, label: 'banner horizontal, sem texto importante nas bordas' },
+    personagem: { width: 1024, height: 1365, label: 'personagem em retrato vertical' }
+  };
+  const format = formats[imageType];
+  const fullPrompt = `${prompt}. Crie uma ${format.label}, bonita, detalhada e apropriada para todas as idades.`;
+  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${format.width}&height=${format.height}&seed=${Date.now()}&nologo=true`;
+
+  sendJson(res, 200, { ok: true, imageUrl, imageType });
+}
+
+async function handleTunnelRestart(req, res) {
+  logger.info('Reiniciando Cloudflare Tunnel manualmente...');
+  stopCloudflareTunnel();
+  tunnelStartAttempts = 0;
+  startCloudflareTunnel();
+  // Aguarda até 15s para o novo link aparecer
+  let attempts = 0;
+  while (!publicTunnelUrl && attempts < 30) {
+    await new Promise(r => setTimeout(r, 500));
+    attempts++;
+  }
+  if (publicTunnelUrl) {
+    sendJson(res, 200, { success: true, publicUrl: publicTunnelUrl, chatUrl: `${publicTunnelUrl}/aly` });
+  } else {
+    sendJson(res, 200, { success: false, message: 'Túnel iniciando... tente copiar o link novamente em alguns segundos.' });
+  }
+}
 
 loadLocalEnv();
 
@@ -43,9 +210,21 @@ const corsMiddleware = cors({
 
 const server = http.createServer(async (req, res) => {
   try {
-    corsMiddleware(req, res, () => {});
-    
-    const url = new URL(req.url, `http://${req.headers.host}`);
+    // Configuração universal de CORS para suporte a qualquer origem, protocolo e porta
+    const origin = req.headers.origin || '*';
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+    // Resposta imediata 204 No Content para preflight OPTIONS do navegador
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      res.end();
+      return;
+    }
+
+    const url = new URL(req.url, `http://${req.headers.host || 'localhost:3000'}`);
 
     if (req.method === 'POST' && url.pathname === '/api/chat') {
       if (!apiLimiter.check(req, res)) return;
@@ -73,8 +252,46 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === 'POST' && url.pathname === '/api/aly-image') {
+      if (!apiLimiter.check(req, res)) return;
+      await handleAlyImage(req, res);
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/computer/propose') {
+      if (!computerControl.localOnly(req)) return sendJson(res, 403, { error: 'O controle do computador só funciona neste computador.' });
+      const body = await readJsonBody(req);
+      return sendJson(res, 200, computerControl.createProposal(body.request));
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/computer/execute') {
+      if (!computerControl.localOnly(req)) return sendJson(res, 403, { error: 'O controle do computador só funciona neste computador.' });
+      const body = await readJsonBody(req);
+      return sendJson(res, 200, computerControl.executeProposal(body.approvalId));
+    }
+
     if (req.method === 'GET' && url.pathname === '/aly') {
       serveAlyStatic(res);
+      return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/game') {
+      serveGameStatic(res);
+      return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/aly-link') {
+      await handleAlyLink(req, res);
+      return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/aly-status') {
+      await handleAlyStatus(req, res);
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/tunnel-restart') {
+      await handleTunnelRestart(req, res);
       return;
     }
 
@@ -94,9 +311,68 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === 'POST' && url.pathname === '/api/auth/register') {
+      if (!authLimiter.check(req, res)) return;
+      const body = await readJsonBody(req);
+      const username = String(body.username || '').trim();
+      const password = String(body.password || '').trim();
+
+      if (!username || !password) {
+        sendJson(res, 400, { error: 'Digite seu usuário e senha.' });
+        return;
+      }
+
+      if (username.length < 3) {
+        sendJson(res, 400, { error: 'O usuário deve ter pelo menos 3 caracteres.' });
+        return;
+      }
+
+      if (password.length < 4) {
+        sendJson(res, 400, { error: 'A senha deve ter pelo menos 4 caracteres.' });
+        return;
+      }
+
+      const result = await createUser(username, password);
+      if (!result.ok) {
+        sendJson(res, 400, { error: result.error });
+        return;
+      }
+
+      setAuthCookie(res, result.user.username);
+      try {
+        notifications.createNotification({
+          title: 'Novo Usuário Cadastrado',
+          message: `Nova conta criada com sucesso para "${result.user.username}".`,
+          category: 'Segurança',
+          priority: 'Média'
+        });
+      } catch {}
+
+      sendJson(res, 200, { ok: true, username: result.user.username });
+      return;
+    }
+
     if (req.method === 'POST' && url.pathname === '/api/auth/logout') {
       clearAuthCookie(res);
       sendJson(res, 200, { ok: true });
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/users/create') {
+      if (!requireAuth(req, res)) return;
+      await handleCreateUser(req, res);
+      return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/users/list') {
+      if (!requireAuth(req, res)) return;
+      sendJson(res, 200, { users: listUsers() });
+      return;
+    }
+
+    if (req.method === 'DELETE' && url.pathname === '/api/users/delete') {
+      if (!requireAuth(req, res)) return;
+      await handleDeleteUser(req, res);
       return;
     }
 
@@ -113,7 +389,8 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && url.pathname === '/api/dev/apply-profile') {
       if (!requireAuth(req, res)) return;
-      const result = await handleApplyProfile(req);
+      const body = await readJsonBody(req);
+      const result = await handleApplyProfile(body);
       sendJson(res, 200, result);
       return;
     }
@@ -214,6 +491,93 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'DELETE' && url.pathname === '/api/memory/knowledge') {
       if (!requireAuth(req, res)) return;
       await handleMemoryDeleteKnowledge(req, res);
+      return;
+    }
+
+    // Rotas da Memória Inteligente (All, Put, Delete)
+    if (req.method === 'GET' && url.pathname === '/api/memory/all') {
+      const userId = getCurrentUserId(req) || 'public';
+      const result = memory.getAllMemories(userId);
+      sendJson(res, 200, { memories: result });
+      return;
+    }
+
+    if (req.method === 'PUT' && url.pathname === '/api/memory/item') {
+      const userId = getCurrentUserId(req) || 'public';
+      const body = await readJsonBody(req);
+      const updated = memory.updateMemoryItem(userId, body.id, body.text, body.category);
+      sendJson(res, 200, { ok: updated });
+      return;
+    }
+
+    if (req.method === 'DELETE' && url.pathname === '/api/memory/item') {
+      const userId = getCurrentUserId(req) || 'public';
+      const body = await readJsonBody(req);
+      const id = body.id || url.searchParams.get('id');
+      const removed = memory.removeMemoryItem(userId, id);
+      sendJson(res, 200, { ok: removed });
+      return;
+    }
+
+    // Rotas do Sistema de Plugins
+    if (req.method === 'GET' && url.pathname === '/api/plugins') {
+      const list = pluginManager.getPluginsList();
+      sendJson(res, 200, { plugins: list });
+      return;
+    }
+
+    // Rotas do Centro de Notificações Inteligentes (Exclusivo Alya Privada)
+    if (req.method === 'GET' && url.pathname === '/api/notifications') {
+      if (!requireAuth(req, res)) return;
+      const data = notifications.getNotifications();
+      sendJson(res, 200, data);
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/notifications/mark-read') {
+      if (!requireAuth(req, res)) return;
+      const body = await readJsonBody(req);
+      const ok = notifications.markAsRead(body.id || 'ALL');
+      const data = notifications.getNotifications();
+      sendJson(res, 200, { ok, ...data });
+      return;
+    }
+
+    if (req.method === 'DELETE' && url.pathname === '/api/notifications') {
+      if (!requireAuth(req, res)) return;
+      const body = await readJsonBody(req).catch(() => ({}));
+      const id = body.id || url.searchParams.get('id') || 'ALL';
+      const ok = notifications.deleteNotification(id);
+      const data = notifications.getNotifications();
+      sendJson(res, 200, { ok, ...data });
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/notifications/create') {
+      if (!requireAuth(req, res)) return;
+      const body = await readJsonBody(req);
+      const item = notifications.createNotification({
+        title: body.title,
+        message: body.message,
+        category: body.category,
+        priority: body.priority,
+        details: body.details
+      });
+      const data = notifications.getNotifications();
+      sendJson(res, 200, { item, ...data });
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/plugins/toggle') {
+      const body = await readJsonBody(req);
+      const ok = await pluginManager.togglePlugin(body.id, body.enable);
+      sendJson(res, 200, { ok, plugins: pluginManager.getPluginsList() });
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/plugins/reload') {
+      await pluginManager.loadAll();
+      sendJson(res, 200, { ok: true, plugins: pluginManager.getPluginsList() });
       return;
     }
 
@@ -355,10 +719,27 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(port, '0.0.0.0', () => {
+server.listen(port, '0.0.0.0', async () => {
   logger.info(`Assistente pronto em http://localhost:${port}`);
+  notifications.createNotification({
+    title: 'Servidor Alya Inicializado',
+    message: `Servidor Alya v2.0.0 ativo em http://localhost:${port}. Pronta para uso!`,
+    category: 'Sistema',
+    priority: 'Média'
+  });
   rotateBackups();
-  
+  startCloudflareTunnel();
+  await pluginManager.init().catch((err) => logger.error('PluginManager init error:', err));
+
+  // Otimização automática de memória RAM (Limpeza a cada 15 min)
+  setInterval(() => {
+    try {
+      if (global.gc) global.gc();
+      const mem = process.memoryUsage();
+      logger.info(`Otimização de Memória: RAM usada ${(mem.heapUsed / 1024 / 1024).toFixed(1)} MB / RSS ${(mem.rss / 1024 / 1024).toFixed(1)} MB`);
+    } catch {}
+  }, 15 * 60 * 1000);
+
   setInterval(() => {
     rotateBackups();
   }, 24 * 60 * 60 * 1000);
@@ -366,12 +747,23 @@ server.listen(port, '0.0.0.0', () => {
   discordManager.start().catch((error) => logger.error('Discord start error:', error));
 });
 
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    logger.error(`Porta ${port} ja esta em uso. Feche o processo anterior ou execute start-alya.ps1`);
+  } else {
+    logger.error('Server listen error:', error);
+  }
+  process.exit(1);
+});
+
 process.on('SIGINT', async () => {
+  stopCloudflareTunnel();
   await discordManager.stop();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
+  stopCloudflareTunnel();
   await discordManager.stop();
   process.exit(0);
 });
@@ -402,7 +794,7 @@ function serveStatic(requestPath, res) {
 
 function requireAuth(req, res) {
   if (isAuthenticated(req)) return true;
-  sendJson(res, 401, { error: 'Digite a senha para entrar na Astra.' });
+  sendJson(res, 401, { error: 'Digite a senha para entrar na Alya.' });
   return false;
 }
 
@@ -417,18 +809,18 @@ async function handleLogin(req, res) {
   }
 
   const result = await validateLogin(body.username, body.password);
-  
+
   if (!result.success) {
     sendJson(res, 401, { error: result.error });
     return;
   }
 
   setAuthCookie(res, result.user);
-  sendJson(res, 200, { 
-    ok: true, 
-    protected: true, 
-    loginMode: users.length > 0 ? 'users' : 'password', 
-    user: result.user 
+  sendJson(res, 200, {
+    ok: true,
+    protected: true,
+    loginMode: users.length > 0 ? 'users' : 'password',
+    user: result.user
   });
 }
 
@@ -436,8 +828,13 @@ async function handleChat(req, res) {
   const { safeMessages, settings } = await getSafeRequest(req);
   const userId = getCurrentUserId(req);
   const memoryContext = memory.getMemoryContext(userId, safeMessages[safeMessages.length - 1]?.content);
-  const reply = await askAssistant(safeMessages, settings, memoryContext);
-  sendJson(res, 200, { reply });
+  try {
+    const reply = await askAssistant(safeMessages, settings, memoryContext);
+    sendJson(res, 200, { reply: reply || 'Recebi sua mensagem.' });
+  } catch (error) {
+    logger.error('Chat error:', error);
+    sendJson(res, 200, { reply: 'Estou com dificuldade de responder agora. Tente de novo em alguns segundos.' });
+  }
 }
 
 async function handleChatStream(req, res) {
@@ -451,6 +848,18 @@ function normalizeAlyReply(reply) {
   if (typeof reply !== 'string') return '';
 
   let text = reply;
+
+  // Remover tags de raciocínio de modelos como DeepSeek R1
+  if (text.includes('</think>')) {
+    text = text.split('</think>').pop();
+  }
+  text = text.replace(/<think>[\s\S]*?<\/think>/gi, '');
+
+  // Filtrar respostas de safety check da API
+  const safetyCrumbs = /^(user safety[:\s]*safe|safe|unsafe|content policy|i cannot|as an ai)/i;
+  if (safetyCrumbs.test(text.trim()) && text.trim().length < 50) {
+    return '';
+  }
 
   text = text.replace(/\*\*.*?\*\*/g, (match) => match.slice(2, -2));
   text = text.replace(/\*.*?\*/g, (match) => match.slice(1, -1));
@@ -466,11 +875,7 @@ function normalizeAlyReply(reply) {
   text = text.replace(/[•·–—−]+/g, '-');
   text = text.replace(/\s+/g, ' ').trim();
 
-  const sentences = text.match(/[^.!?]*[.!?]+/g) || [text];
-  const shortSentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
-  const limited = shortSentences.slice(0, 50);
-
-  return limited.join(' ').trim();
+  return text;
 }
 
 async function handleAlyChat(req, res) {
@@ -489,17 +894,57 @@ async function handleAlyChat(req, res) {
     return;
   }
 
-  const settings = normalizeSettings(body.settings || {});
-  const memoryContext = memory.getMemoryContext('public', safeMessages[safeMessages.length - 1]?.content);
-  let reply = await askAssistant(safeMessages, settings, memoryContext);
+  const lastUserMsg = safeMessages[safeMessages.length - 1]?.content || '';
+  const userId = 'public';
 
-  if (/cannot read .* image/i.test(reply)) {
-    reply = 'No momento eu nao consigo analisar imagens. Envie apenas texto, que eu respondo na hora.';
-  } else {
-    reply = normalizeAlyReply(reply);
+  // Extração inteligente de memória em background
+  memory.extractSmartMemories(userId, lastUserMsg);
+
+  const settings = normalizeSettings(body.settings || {});
+  let memoryContext = memory.getMemoryContext(userId, lastUserMsg);
+
+  // Executar hook de plugins (ex: plugin de busca web)
+  try {
+    const hookRes = await pluginManager.runHook('beforeMessage', {
+      lastUserMessage: lastUserMsg,
+      systemPrompt: memoryContext
+    });
+    if (hookRes && hookRes.systemPrompt) {
+      memoryContext = hookRes.systemPrompt;
+    }
+  } catch {}
+
+  // Se não foi pesquisado via plugin mas precisa de busca, realizar busca web direta
+  if (shouldSearchWeb(lastUserMsg) && !memoryContext.includes('[DADOS PESQUISADOS NA INTERNET')) {
+    try {
+      const searchResult = await searchWeb(lastUserMsg);
+      if (searchResult && searchResult.text) {
+        memoryContext += `\n\n[DADOS PESQUISADOS NA INTERNET EM TEMPO REAL]:\n${searchResult.text}\nUse estas informações verdadeiras e atualizadas da web para responder à pergunta sobre "${lastUserMsg}".`;
+      }
+    } catch {}
   }
 
-  sendJson(res, 200, { reply });
+  const imageReply = 'No momento eu nao consigo analisar imagens. Envie apenas texto, que eu respondo na hora.';
+  const fallbackReply = 'Estou com dificuldade de responder agora. Tente de novo em alguns segundos.';
+
+  try {
+    let reply = await askAssistant(safeMessages, settings, memoryContext);
+
+    if (/cannot read .* image|model does not support image input|image input not supported/i.test(reply)) {
+      reply = imageReply;
+    } else {
+      reply = normalizeAlyReply(reply);
+      if (!reply.trim()) {
+        reply = 'Recebi sua mensagem. Pode me perguntar mais detalhes?';
+      }
+    }
+
+    sendJson(res, 200, { reply });
+  } catch (error) {
+    logger.error('Aly chat error:', error);
+    const message = /limite gratuito de hoje/i.test(error.message || '') ? error.message : fallbackReply;
+    sendJson(res, 200, { reply: message });
+  }
 }
 
 async function handleAlyChatStream(req, res) {
@@ -518,8 +963,36 @@ async function handleAlyChatStream(req, res) {
     return;
   }
 
+  const lastUserMsg = safeMessages[safeMessages.length - 1]?.content || '';
+  const userId = 'public';
+
+  // Extração inteligente de memória em background
+  memory.extractSmartMemories(userId, lastUserMsg);
+
   const settings = normalizeSettings(body.settings || {});
-  const memoryContext = memory.getMemoryContext('public', safeMessages[safeMessages.length - 1]?.content);
+  let memoryContext = memory.getMemoryContext(userId, lastUserMsg);
+
+  // Executar hook de plugins
+  try {
+    const hookRes = await pluginManager.runHook('beforeMessage', {
+      lastUserMessage: lastUserMsg,
+      systemPrompt: memoryContext
+    });
+    if (hookRes && hookRes.systemPrompt) {
+      memoryContext = hookRes.systemPrompt;
+    }
+  } catch {}
+
+  // Pesquisa web ao vivo
+  if (shouldSearchWeb(lastUserMsg) && !memoryContext.includes('[DADOS PESQUISADOS NA INTERNET')) {
+    try {
+      const searchResult = await searchWeb(lastUserMsg);
+      if (searchResult && searchResult.text) {
+        memoryContext += `\n\n[DADOS PESQUISADOS NA INTERNET EM TEMPO REAL]:\n${searchResult.text}\nUse estas informações verdadeiras e atualizadas da web para responder à pergunta sobre "${lastUserMsg}".`;
+      }
+    } catch {}
+  }
+
   await askAssistantStream(safeMessages, settings, res, memoryContext);
 }
 
@@ -539,10 +1012,26 @@ function serveAlyStatic(res) {
   });
 }
 
+function serveGameStatic(res) {
+  const filePath = path.join(publicDir, 'game.html');
+  fs.readFile(filePath, (error, data) => {
+    if (error) {
+      sendText(res, 404, 'Jogo nao encontrado.');
+      return;
+    }
+
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store'
+    });
+    res.end(data);
+  });
+}
+
 async function handleHealthCheck(req, res) {
   const health = {
     ok: true,
-    name: 'Astra',
+    name: 'Alya',
     version: '2.0.0',
     timestamp: new Date().toISOString(),
     dependencies: {
@@ -554,7 +1043,7 @@ async function handleHealthCheck(req, res) {
       ready: discordManager.isReady()
     }
   };
-  
+
   sendJson(res, 200, health);
 }
 
@@ -739,12 +1228,12 @@ async function handleRestoreBackup(req) {
 
 function getCurrentUserId(req) {
   const cookie = req.headers.cookie || '';
-  const match = cookie.match(/nova-session=([^;]+)/);
+  const match = cookie.match(new RegExp(`${authCookieName}=([^;]+)`));
   if (!match) return 'anonymous';
   try {
-    const decoded = decodeURIComponent(match[1]);
-    const payload = JSON.parse(decoded);
-    return String(payload.user || 'anonymous');
+    const token = decodeURIComponent(match[1]);
+    const username = String(token || '').split('.')[0];
+    return username || 'anonymous';
   } catch {
     return 'anonymous';
   }
@@ -754,12 +1243,12 @@ async function handleMemoryRemember(req, res) {
   const body = await readJsonBody(req);
   const userId = getCurrentUserId(req);
   const { text, category } = body;
-  
+
   if (!text || !String(text).trim()) {
     sendJson(res, 400, { error: 'Texto da memoria e obrigatorio.' });
     return;
   }
-  
+
   const entry = memory.addPermanentMemory(userId, String(text).trim(), category);
   sendJson(res, 200, { ok: true, memory: entry });
 }
@@ -768,12 +1257,12 @@ async function handleMemoryForget(req, res) {
   const body = await readJsonBody(req);
   const userId = getCurrentUserId(req);
   const { text } = body;
-  
+
   if (!text || !String(text).trim()) {
     sendJson(res, 400, { error: 'Texto da memoria e obrigatorio.' });
     return;
   }
-  
+
   const memories = memory.searchPermanentMemory(userId, String(text).trim());
   let removed = 0;
   memories.forEach(m => {
@@ -782,7 +1271,7 @@ async function handleMemoryForget(req, res) {
       removed++;
     }
   });
-  
+
   sendJson(res, 200, { ok: true, removed });
 }
 
@@ -790,12 +1279,12 @@ async function handleMemoryKnowledge(req, res) {
   const body = await readJsonBody(req);
   const userId = getCurrentUserId(req);
   const { title, content, type } = body;
-  
+
   if (!title || !content || !String(title).trim() || !String(content).trim()) {
     sendJson(res, 400, { error: 'Titulo e conteudo sao obrigatorios.' });
     return;
   }
-  
+
   const entry = memory.addKnowledge(userId, String(title).trim(), String(content).trim(), type);
   sendJson(res, 200, { ok: true, knowledge: entry });
 }
@@ -804,12 +1293,12 @@ async function handleMemoryDeletePermanent(req, res) {
   const body = await readJsonBody(req);
   const userId = getCurrentUserId(req);
   const { id } = body;
-  
+
   if (!id) {
     sendJson(res, 400, { error: 'ID da memoria e obrigatorio.' });
     return;
   }
-  
+
   memory.removePermanentMemory(userId, String(id));
   sendJson(res, 200, { ok: true });
 }
@@ -818,14 +1307,50 @@ async function handleMemoryDeleteKnowledge(req, res) {
   const body = await readJsonBody(req);
   const userId = getCurrentUserId(req);
   const { id } = body;
-  
+
   if (!id) {
     sendJson(res, 400, { error: 'ID do conhecimento e obrigatorio.' });
     return;
   }
-  
+
   memory.removeKnowledge(userId, String(id));
   sendJson(res, 200, { ok: true });
+}
+
+async function handleCreateUser(req, res) {
+  const body = await readJsonBody(req);
+  const { username, password } = body;
+
+  if (!username || !password) {
+    sendJson(res, 400, { error: 'Nome de usuario e senha sao obrigatorios.' });
+    return;
+  }
+
+  const result = await createUser(username, password);
+
+  if (result.ok) {
+    sendJson(res, 200, result);
+  } else {
+    sendJson(res, 400, { error: result.error });
+  }
+}
+
+async function handleDeleteUser(req, res) {
+  const body = await readJsonBody(req);
+  const { username } = body;
+
+  if (!username) {
+    sendJson(res, 400, { error: 'Nome de usuario e obrigatorio.' });
+    return;
+  }
+
+  const result = deleteUser(username);
+
+  if (result.ok) {
+    sendJson(res, 200, result);
+  } else {
+    sendJson(res, 400, { error: result.error });
+  }
 }
 
 process.on('uncaughtException', (error) => {

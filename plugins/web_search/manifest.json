@@ -1,0 +1,12 @@
+{
+  "id": "web_search",
+  "name": "Pesquisa na Internet (Ao Vivo)",
+  "version": "1.0.0",
+  "description": "Busca informações atualizadas em tempo real na web (como campeões do Super Bowl, resultados de jogos, clima e notícias).",
+  "author": "Alya Core",
+  "enabled": true,
+  "defaultSettings": {
+    "autoSearch": true,
+    "maxResults": 3
+  }
+}

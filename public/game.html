@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ALYA — Quantum Control Room (Jogo de Painel Futuristic)</title>
+  <meta name="description" content="Jogo de simulação e estratégia de controle de reator quântico da Alya. Gerencie energia, contenha ameaças cibernéticas e sobreviva!">
+  <link rel="stylesheet" href="/game.css">
+</head>
+<body>
+  <canvas id="canvas-bg"></canvas>
+
+  <div class="app-container">
+    <!-- Header Controls & High Scores -->
+    <header class="top-bar">
+      <div class="logo-group">
+        <h1 class="logo-title">ALYA NEXUS</h1>
+        <span class="logo-badge">QUANTUM CORE v3.0</span>
+      </div>
+
+      <div class="top-stats">
+        <div class="stat-box">
+          <span class="stat-label">Pontuação / Tempo</span>
+          <span class="stat-value" id="score-val">0000</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Energia Quântica</span>
+          <span class="stat-value" id="energy-val">1000 W</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Nível da Ameça</span>
+          <span class="stat-value" id="threat-lvl-val">1.0x</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Integridade do Reator</span>
+          <span class="stat-value" id="health-val">100%</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Dashboard Grid -->
+    <main class="dashboard-grid">
+      <!-- Left Panel: Power Allocation Grid -->
+      <section class="panel">
+        <div class="panel-header">
+          <span>⚡ Distribuição de Energia</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted);" id="power-pct-total">100%</span>
+        </div>
+
+        <div class="power-slider-group">
+          <div class="power-item">
+            <div class="power-label">
+              <span>IA Brain Core</span>
+              <span id="pwr-brain-val">25%</span>
+            </div>
+            <input type="range" class="power-slider" id="pwr-brain" min="0" max="100" value="25">
+          </div>
+
+          <div class="power-item">
+            <div class="power-label">
+              <span>Escudos de Contenção</span>
+              <span id="pwr-shields-val">25%</span>
+            </div>
+            <input type="range" class="power-slider" id="pwr-shields" min="0" max="100" value="25">
+          </div>
+
+          <div class="power-item">
+            <div class="power-label">
+              <span>Firewall Cyber-Defense</span>
+              <span id="pwr-firewall-val">25%</span>
+            </div>
+            <input type="range" class="power-slider" id="pwr-firewall" min="0" max="100" value="25">
+          </div>
+
+          <div class="power-item">
+            <div class="power-label">
+              <span>Sistema de Refrigeração</span>
+              <span id="pwr-coolant-val">25%</span>
+            </div>
+            <input type="range" class="power-slider" id="pwr-coolant" min="0" max="100" value="25">
+          </div>
+        </div>
+
+        <div style="margin-top: auto; padding-top: 10px; border-top: 1px dashed rgba(0,240,255,0.2);">
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 6px;">Status dos Sub-Sistemas:</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 0.75rem;">
+            <div style="color: var(--green-glow);">● NÚCLEO: OK</div>
+            <div style="color: var(--green-glow);">● RESFRIADOR: ATIVO</div>
+            <div style="color: var(--cyan-glow);">● REDE: SEGURA</div>
+            <div style="color: var(--yellow-glow);">● SENSORS: ONLINE</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Center Viewport: Quantum Core Reactor & Threat Breach Panel -->
+      <section class="center-viewport">
+        <div class="panel reactor-container">
+          <div class="reactor-ring">
+            <div class="reactor-core" id="reactor-core-btn">
+              <span class="core-pct" id="core-temp-val">42°C</span>
+              <span class="core-sub">BATER CORE</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cyber Threat Protocols Grid -->
+        <div class="panel">
+          <div class="panel-header">
+            <span>🛡️ Protocolos de Resposta a Ameaças</span>
+            <span style="font-size: 0.7rem; color: var(--magenta-glow);" id="active-breaches-count">0 AMEAÇAS</span>
+          </div>
+
+          <div class="threat-grid">
+            <div class="threat-card" id="threat-0">
+              <span class="threat-title">Ataque DDoS</span>
+              <button class="threat-btn" id="btn-fix-0">LIMPAR LOGS</button>
+            </div>
+            <div class="threat-card" id="threat-1">
+              <span class="threat-title">Sobrecarga Quântica</span>
+              <button class="threat-btn" id="btn-fix-1">DISPARAR VENTILAÇÃO</button>
+            </div>
+            <div class="threat-card" id="threat-2">
+              <span class="threat-title">Injeção Malware</span>
+              <button class="threat-btn" id="btn-fix-2">PATCH FIREWALL</button>
+            </div>
+            <div class="threat-card" id="threat-3">
+              <span class="threat-title">Flutuação de Fase</span>
+              <button class="threat-btn" id="btn-fix-3">ESTABILIZAR FASE</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Panel: Upgrades & Live Terminal Logs -->
+      <section class="panel">
+        <div class="panel-header">
+          <span>🛠️ Upgrades da Alya</span>
+        </div>
+
+        <div class="upgrades-list">
+          <div class="upgrade-card">
+            <div class="upg-info">
+              <span class="upg-name">Resfriamento Crio</span>
+              <span class="upg-cost" id="upg1-cost">150 Energia</span>
+            </div>
+            <button class="upg-btn" id="upg1-btn">COMPRAR</button>
+          </div>
+
+          <div class="upgrade-card">
+            <div class="upg-info">
+              <span class="upg-name">Auto-Escudo AI</span>
+              <span class="upg-cost" id="upg2-cost">300 Energia</span>
+            </div>
+            <button class="upg-btn" id="upg2-btn">COMPRAR</button>
+          </div>
+
+          <div class="upgrade-card">
+            <div class="upg-info">
+              <span class="upg-name">Gerador Quântico</span>
+              <span class="upg-cost" id="upg3-cost">500 Energia</span>
+            </div>
+            <button class="upg-btn" id="upg3-btn">COMPRAR</button>
+          </div>
+        </div>
+
+        <div class="panel-header" style="margin-top: 12px;">
+          <span>📟 Terminal de Eventos</span>
+        </div>
+
+        <div class="log-terminal" id="log-terminal">
+          <div class="log-entry info">[SISTEMA] Painel de Controle Alya inicializado com sucesso.</div>
+          <div class="log-entry success">[OK] Reator estabilizado em 42°C.</div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer Bar -->
+    <footer class="bottom-bar">
+      <span>ALYA QUANTUM CORE CONTROL PANEL — MODO ALTA VELOCIDADE</span>
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <button class="sound-toggle-btn" id="sound-btn">🔊 SOM: LIGADO</button>
+        <a href="/" style="color: var(--cyan-glow); text-decoration: none; font-size: 0.8rem;">← Voltar à Alya</a>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Game Over Modal -->
+  <div class="modal-overlay" id="gameover-modal">
+    <div class="modal-content">
+      <h2 class="modal-title">REATORCOLAPSOU!</h2>
+      <p style="color: var(--text-main);">A integridade do Núcleo Quântico chegou a 0% devido a sobrecarga ou ataques cibernéticos.</p>
+      <p style="color: var(--yellow-glow); font-family: var(--font-code); font-size: 1.2rem;" id="final-score">Pontuação Final: 0</p>
+      <button class="modal-btn" id="restart-btn">REINICIAR SISTEMA</button>
+    </div>
+  </div>
+
+  <script src="/game.js"></script>
+</body>
+</html>

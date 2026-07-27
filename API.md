@@ -1,4 +1,4 @@
-# API Documentation - Astra v2.0
+# API Documentation - Alya v2.0
 
 ## Base URL
 
@@ -8,7 +8,7 @@ http://localhost:3000
 
 ## Autenticação
 
-A maioria dos endpoints requer autenticação. Use o cookie `astra_session` gerado após login.
+A maioria dos endpoints requer autenticação. Use o cookie `alya_session` gerado após login.
 
 ## Endpoints
 
@@ -24,7 +24,7 @@ GET /health
 ```json
 {
   "ok": true,
-  "name": "Astra",
+  "name": "Alya",
   "version": "2.0.0",
   "timestamp": "2024-01-01T00:00:00.000Z",
   "dependencies": {
@@ -63,7 +63,7 @@ Content-Type: application/json
 
 {
   "username": "pedro",
-  "password": "astra123"
+  "password": "alya123"
 }
 ```
 
@@ -160,7 +160,7 @@ Era uma vez...
 
 #### Ler Perfil
 
-Lê o perfil atual da Astra.
+Lê o perfil atual da Alya.
 
 ```http
 GET /api/dev/profile
@@ -171,7 +171,7 @@ GET /api/dev/profile
 {
   "ok": true,
   "profile": {
-    "name": "Astra",
+    "name": "Alya",
     "personality": "jarvis",
     "memory": "Usuário gosta de tecnologia",
     "updatedAt": "2024-01-01T00:00:00.000Z"
@@ -181,7 +181,7 @@ GET /api/dev/profile
 
 #### Aplicar Perfil
 
-Aplica alterações ao perfil da Astra.
+Aplica alterações ao perfil da Alya.
 
 ```http
 POST /api/dev/apply-profile
@@ -203,7 +203,7 @@ Content-Type: application/json
   "file": "nova-data/profile.json",
   "backup": "nova-data/backups/profile-2024-01-01.json",
   "profile": {
-    "name": "Astra",
+    "name": "Alya",
     "personality": "amiga",
     "memory": "Usuário prefere respostas curtas",
     "updatedAt": "2024-01-01T00:00:00.000Z"

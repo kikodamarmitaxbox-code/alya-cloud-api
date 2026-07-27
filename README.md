@@ -1,6 +1,6 @@
-# Astra - Assistente IA
+# Alya - Assistente IA
 
-Astra é uma assistente pessoal leve que usa APIs gratuitas de IA com interface web moderna.
+Alya é uma assistente pessoal leve que usa APIs gratuitas de IA com interface web moderna.
 
 ## Deploy Rápido
 
@@ -21,7 +21,7 @@ railway up
 ```
 
 Após o deploy, o Railway fornecerá um link público permanente como:
-`https://astra-ia-production.up.railway.app`
+`https://alya-ia-production.up.railway.app`
 
 ### Render
 
