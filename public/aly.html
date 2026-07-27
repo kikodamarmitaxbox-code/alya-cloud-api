@@ -107,6 +107,7 @@
         <div class="conversation-heading"><span class="heading-dot"></span><span>Nova conversa</span></div>
       </div>
       <div class="header-actions">
+        <button id="toolsButton" class="share-btn" type="button" title="Ferramentas profissionais">✦ Ferramentas</button>
         <button id="searchButton" class="icon-btn header-search-button" type="button" title="Buscar na conversa" aria-label="Buscar na conversa">⌕</button>
         <button id="themeButton" class="icon-btn theme-button" type="button" title="Alterar tema" aria-label="Alterar tema">☼</button>
         <button id="computerButton" class="share-btn" type="button" title="Controle seguro do computador">⌘ Computador</button>
@@ -149,15 +150,20 @@
     <section class="composer-section">
       <form id="chatForm" class="composer">
         <label class="sr-only" for="messageInput">Mensagem</label>
-        <textarea id="messageInput" name="message" rows="1" placeholder="Pergunte à Alya qualquer coisa..." required></textarea>
+        <textarea id="messageInput" name="message" rows="1" placeholder="Pergunte à Alya qualquer coisa..."></textarea>
+        <div id="attachmentChip" class="attachment-chip" hidden>
+          <span id="attachmentName"></span>
+          <button id="removeAttachmentButton" type="button" aria-label="Remover arquivo">×</button>
+        </div>
+        <input id="fileInput" type="file" accept=".pdf,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.webp,.gif,text/*,image/*,application/pdf" hidden />
         <div class="composer-toolbar">
           <div class="toolbar-left">
-            <button class="toolbar-btn" type="button" title="Anexar">＋ <span>Anexar</span></button>
+            <button id="attachButton" class="toolbar-btn" type="button" title="Anexar">＋ <span>Anexar</span></button>
             <button class="toolbar-btn" type="button" title="Buscar">⌕ <span>Pesquisar</span></button>
             <button class="toolbar-btn reasoning-btn" type="button" title="Raciocínio">✦ <span>Raciocinar</span></button>
           </div>
           <div class="toolbar-right">
-            <div class="model-select-pill"><i></i>Alya Pro <span>⌄</span></div>
+            <div id="modelStatusPill" class="model-select-pill" title="Situação do modelo"><i></i><span id="modelStatusText">Verificando IA</span></div>
             <button id="voiceInputButton" class="voice-input-btn" type="button" title="Falar com a Alya" aria-label="Falar com a Alya">🎙</button>
             <button id="sendButton" class="send-btn" type="submit" title="Enviar" aria-label="Enviar">↑</button>
           </div>
@@ -206,6 +212,22 @@
     </div>
   </section>
 
+  <section id="toolsModal" class="memory-modal" aria-label="Ferramentas profissionais" hidden>
+    <div class="memory-card tools-card">
+      <header class="memory-header">
+        <div><h2>Ferramentas profissionais</h2><p>Escolha uma opção e a Alya vai conduzir tudo pelo chat.</p></div>
+        <button id="closeToolsButton" class="icon-button" type="button" title="Fechar">×</button>
+      </header>
+      <div class="professional-tools-grid">
+        <button type="button" data-tool-prompt="Quero criar um currículo profissional. Faça uma pergunta por vez, não invente informações e, quando terminar, monte o currículo completo e bem organizado."><span>▤</span><strong>Gerar currículo</strong><small>Perguntas guiadas e texto final</small></button>
+        <button type="button" data-tool-prompt="Quero criar uma carta de apresentação profissional. Pergunte uma informação por vez sobre mim e sobre a vaga; depois escreva uma carta personalizada, sem inventar dados."><span>✉</span><strong>Carta de apresentação</strong><small>Personalizada para a vaga</small></button>
+        <button type="button" data-tool-prompt="Quero planejar minha rotina. Pergunte uma informação por vez sobre meus horários, compromissos, prioridades, descanso e objetivo; depois crie uma rotina realista."><span>◷</span><strong>Planejar rotina</strong><small>Horários e prioridades</small></button>
+        <button type="button" data-tool-prompt="Quero um plano de treino geral. Pergunte uma informação por vez sobre objetivo, experiência, dias disponíveis, equipamentos, limitações e dores. Não dê diagnóstico médico e recomende avaliação profissional quando necessário."><span>◇</span><strong>Plano de treino</strong><small>Seguro e adaptado</small></button>
+        <button type="button" data-tool-prompt="Quero organizar uma alimentação geral e saudável. Pergunte uma informação por vez sobre rotina, preferências, alergias, restrições e objetivo. Não prescreva dieta médica e recomende nutricionista para necessidades clínicas."><span>◉</span><strong>Alimentação</strong><small>Organização geral e segura</small></button>
+      </div>
+    </div>
+  </section>
+
   <section id="imageStudioModal" class="memory-modal" aria-label="Criar imagem" hidden>
     <div class="memory-card image-studio-card">
       <header class="memory-header">
@@ -249,6 +271,7 @@
     </div>
   </section>
 
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
   <script src="aly.js"></script>
 </body>
 </html>

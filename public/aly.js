@@ -59,6 +59,17 @@ const computerApproval = document.querySelector('#computerApproval');
 const computerApprovalText = document.querySelector('#computerApprovalText');
 const approveComputerAction = document.querySelector('#approveComputerAction');
 const computerStatus = document.querySelector('#computerStatus');
+const toolsButton = document.querySelector('#toolsButton');
+const toolsModal = document.querySelector('#toolsModal');
+const closeToolsButton = document.querySelector('#closeToolsButton');
+const attachButton = document.querySelector('#attachButton');
+const fileInput = document.querySelector('#fileInput');
+const attachmentChip = document.querySelector('#attachmentChip');
+const attachmentName = document.querySelector('#attachmentName');
+const removeAttachmentButton = document.querySelector('#removeAttachmentButton');
+const modelStatusPill = document.querySelector('#modelStatusPill');
+const modelStatusText = document.querySelector('#modelStatusText');
+const toastContainer = document.querySelector('#toastContainer');
 
 const storageKey = 'nova-chat-history';
 const settingsKey = 'nova-settings';
@@ -78,6 +89,119 @@ let selectedImageType = 'avatar';
 let selectedImageStyle = 'cinematico';
 let pendingComputerApproval = null;
 let voiceRecognition = null;
+let pendingAttachment = null;
+let previousProviderSignature = '';
+
+const providerLabels = {
+  openrouter: 'OpenRouter',
+  gemini: 'Gemini',
+  groq: 'Groq',
+  nvidia: 'NVIDIA',
+  deepseek: 'DeepSeek',
+  mistral: 'Mistral',
+  cerebras: 'Cerebras',
+  together: 'Together'
+};
+
+function showToast(message, kind = 'info') {
+  if (!toastContainer || !message) return;
+  const toast = document.createElement('div');
+  toast.className = `alya-toast ${kind}`;
+  toast.textContent = message;
+  toastContainer.appendChild(toast);
+  setTimeout(() => toast.remove(), 5200);
+}
+
+async function refreshProviderStatus(notify = false) {
+  try {
+    const response = await fetch(`${apiBase}/api/ai-status`, { cache: 'no-store' });
+    if (!response.ok) return;
+    const status = await response.json();
+    const configured = (status.providers || []).filter((item) => item.configured);
+    const active = status.active || status.preferred;
+    const label = providerLabels[active] || active || 'IA';
+    const hasFallback = configured.length > 1;
+    if (modelStatusText) modelStatusText.textContent = `${label}${hasFallback ? ' · proteção ativa' : ''}`;
+    if (modelStatusPill) {
+      modelStatusPill.classList.toggle('provider-fallback', Boolean(status.switched));
+      modelStatusPill.title = status.switched
+        ? `O modelo principal caiu. A Alya trocou automaticamente para ${label}.`
+        : `${label} está pronto.`;
+    }
+
+    const signature = `${status.preferred}:${active}:${status.switched}`;
+    if (notify && previousProviderSignature && signature !== previousProviderSignature) {
+      showToast(
+        status.switched
+          ? `O modelo principal ficou indisponível. A Alya mudou automaticamente para ${label}.`
+          : `${label} voltou a funcionar como modelo principal.`,
+        status.switched ? 'warning' : 'success'
+      );
+    }
+    previousProviderSignature = signature;
+  } catch {
+    if (modelStatusText) modelStatusText.textContent = 'IA reconectando';
+  }
+}
+
+function clearAttachment() {
+  pendingAttachment = null;
+  if (fileInput) fileInput.value = '';
+  if (attachmentChip) attachmentChip.hidden = true;
+  if (attachmentName) attachmentName.textContent = '';
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || '').split(',')[1] || '');
+    reader.onerror = () => reject(new Error('Não consegui ler o arquivo.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function prepareAttachment(file) {
+  if (!file) return;
+  if (file.size > 4 * 1024 * 1024) {
+    showToast('Escolha um arquivo de até 4 MB.', 'warning');
+    clearAttachment();
+    return;
+  }
+
+  pendingAttachment = { name: file.name, loading: true, context: '' };
+  attachmentChip.hidden = false;
+  attachmentName.textContent = `Lendo ${file.name}...`;
+  attachButton.disabled = true;
+
+  try {
+    const data = await fileToBase64(file);
+    const response = await fetch(`${apiBase}/api/aly-file`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: file.name,
+        mime: file.type || 'application/octet-stream',
+        data,
+        question: messageInput.value.trim()
+      })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.ok) throw new Error(result.error || 'Não consegui ler o arquivo.');
+
+    const context = result.kind === 'image'
+      ? `[ANÁLISE DA IMAGEM "${result.name}"]\n${result.analysis}`
+      : `[CONTEÚDO DO ARQUIVO "${result.name}"${result.truncated ? ' — trecho inicial' : ''}]\n${result.text}`;
+    pendingAttachment = { name: result.name, loading: false, context };
+    attachmentName.textContent = `📎 ${result.name}`;
+    showToast('Arquivo pronto. Agora envie sua pergunta.', 'success');
+    messageInput.focus();
+  } catch (error) {
+    showToast(error.message || 'Não consegui ler o arquivo.', 'warning');
+    clearAttachment();
+  } finally {
+    attachButton.disabled = false;
+  }
+}
 
 function setupVoiceInput() {
   if (!voiceInputButton) return;
@@ -340,6 +464,7 @@ async function tryComputerCommand(content) {
 function setBusy(isBusy) {
   sendButton.disabled = isBusy;
   messageInput.disabled = isBusy;
+  if (attachButton) attachButton.disabled = isBusy;
   if (isBusy) showTypingIndicator();
   else hideTypingIndicator();
 }
@@ -640,36 +765,55 @@ function render() {
 }
 
 async function sendMessage(content) {
-  if (!content.trim()) return;
+  if (pendingAttachment?.loading) {
+    showToast('Espere o arquivo terminar de carregar.', 'warning');
+    return;
+  }
+  const typedContent = String(content || '').trim();
+  if (!typedContent && !pendingAttachment) return;
+  const visibleContent = typedContent || 'Analise este arquivo para mim.';
+  const attachmentForRequest = pendingAttachment;
 
   if (welcomeScreen) welcomeScreen.hidden = true;
-  history.push({ role: 'user', content: content.trim() });
-  appendMessage('user', content.trim());
+  history.push({
+    role: 'user',
+    content: attachmentForRequest ? `${visibleContent}\n📎 ${attachmentForRequest.name}` : visibleContent
+  });
+  appendMessage('user', attachmentForRequest ? `${visibleContent}\n📎 ${attachmentForRequest.name}` : visibleContent);
   messageInput.value = '';
   messageInput.style.height = 'auto';
   // No celular, fecha o teclado para a resposta da Alya ficar visível.
   if (isSimpleMobileLink) messageInput.blur();
   setBusy(true);
 
-  updateConversationTitle(currentConversationId, content.trim());
+  updateConversationTitle(currentConversationId, visibleContent);
   saveConversationHistory(currentConversationId, history);
   renderSidebarConversations();
 
-  if (await tryComputerCommand(content.trim())) {
+  if (!attachmentForRequest && await tryComputerCommand(visibleContent)) {
     setBusy(false);
     saveConversationHistory(currentConversationId, history);
     return;
   }
 
-  const imageRequest = getImageRequestFromChat(content.trim());
+  const imageRequest = !attachmentForRequest && getImageRequestFromChat(visibleContent);
   if (imageRequest) {
     await createImageFromChat(imageRequest);
     setBusy(false);
     return;
   }
 
+  const messagesForRequest = history.slice(-8).map((message, index, list) => {
+    if (!attachmentForRequest || index !== list.length - 1 || message.role !== 'user') return message;
+    return {
+      role: 'user',
+      content: `${visibleContent}\n\n${attachmentForRequest.context}\n\nResponda à pergunta usando o arquivo. Se for trabalho escolar, explique para a pessoa aprender em vez de apenas dar uma resposta sem explicação.`
+    };
+  });
+  clearAttachment();
+
   const body = {
-    messages: history.slice(-8),
+    messages: messagesForRequest,
     settings: {
       personality: personalitySelect.value,
       mode: modeSelect.value,
@@ -743,6 +887,7 @@ async function sendMessage(content) {
     appendMessage('assistant', 'Estou com dificuldade de responder agora. Tente de novo em alguns segundos.');
   } finally {
     setBusy(false);
+    refreshProviderStatus(true);
     messageInput.focus();
   }
 }
@@ -852,6 +997,26 @@ document.querySelectorAll('[data-prompt]').forEach(card => {
     messageInput.value = prompt + ' ';
     messageInput.focus();
     welcomeScreen.hidden = true;
+  });
+});
+
+attachButton?.addEventListener('click', () => fileInput?.click());
+fileInput?.addEventListener('change', () => prepareAttachment(fileInput.files?.[0]));
+removeAttachmentButton?.addEventListener('click', clearAttachment);
+
+toolsButton?.addEventListener('click', () => {
+  if (toolsModal) toolsModal.hidden = false;
+});
+closeToolsButton?.addEventListener('click', () => {
+  if (toolsModal) toolsModal.hidden = true;
+});
+toolsModal?.addEventListener('click', (event) => {
+  if (event.target === toolsModal) toolsModal.hidden = true;
+});
+document.querySelectorAll('[data-tool-prompt]').forEach((button) => {
+  button.addEventListener('click', () => {
+    if (toolsModal) toolsModal.hidden = true;
+    sendMessage(button.dataset.toolPrompt || '');
   });
 });
 
@@ -1041,6 +1206,7 @@ function init() {
       renderSidebarConversations();
       updateConversationHeading();
       updateWelcomeVisibility();
+      await refreshProviderStatus(false);
 
       // Não bloquear a inicialização se o link/tunnel falhar
       try { await Promise.race([loadPublicLink(), new Promise(r => setTimeout(r, 3000))]); } catch {}
@@ -1054,6 +1220,7 @@ function init() {
       }, 1000);
 
       setInterval(checkTunnelStatus, 5000);
+      setInterval(() => refreshProviderStatus(true), 60000);
     } catch (error) {
       safeHideLoading();
       console.error('Erro na inicializacao:', error);

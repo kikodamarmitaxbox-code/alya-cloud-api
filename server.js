@@ -7,7 +7,7 @@ const { spawn } = require('child_process');
 
 const logger = require('./lib/logger');
 const { isAuthenticated, hasSitePassword, validateLogin, setAuthCookie, clearAuthCookie, readSiteUsers, authCookieName } = require('./lib/auth');
-const { askAssistant, askAssistantStream, normalizeSettings } = require('./lib/chat');
+const { askAssistant, askAssistantStream, normalizeSettings, getProviderStatus } = require('./lib/chat');
 const { handleWhatsappReceive, handleWhatsappApprove, handleWhatsappCancel, getWhatsappQueue, readWhatsappLog } = require('./lib/whatsapp');
 const { DiscordManager } = require('./lib/discord');
 const FileStorage = require('./lib/storage/FileStorage');
@@ -172,11 +172,131 @@ async function handleAlyImage(req, res) {
   };
   const format = formats[imageType];
   const fullPrompt = `${prompt}. Create a ${format.label}. ${styles[imageStyle]}. High quality, polished details, balanced composition, beautiful background, no watermark, no logo, no readable text. Appropriate for all ages.`;
-  // O provedor gratuito falha de forma intermitente quando recebe um seed manual.
-  // Sem seed, ele escolhe a variação e responde de forma mais estável.
-  const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${format.width}&height=${format.height}&nologo=true`;
+  const apiKey = process.env.POLLINATIONS_API_KEY;
+  if (!apiKey) {
+    throw new UserFacingError('O gerador de imagens ainda precisa da chave POLLINATIONS_API_KEY no Render.');
+  }
 
-  sendJson(res, 200, { ok: true, imageUrl, imageType, imageStyle });
+  const model = process.env.POLLINATIONS_IMAGE_MODEL || 'flux';
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 90000);
+
+  try {
+    const imageUrl = `https://gen.pollinations.ai/image/${encodeURIComponent(fullPrompt)}?width=${format.width}&height=${format.height}&model=${encodeURIComponent(model)}&nologo=true`;
+    const response = await fetch(imageUrl, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      throw new Error(`Gerador respondeu ${response.status}`);
+    }
+
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    if (!contentType.startsWith('image/')) throw new Error('O gerador não devolveu uma imagem.');
+    const imageBuffer = Buffer.from(await response.arrayBuffer());
+    if (imageBuffer.length > 10 * 1024 * 1024) throw new Error('A imagem gerada ficou grande demais.');
+
+    sendJson(res, 200, {
+      ok: true,
+      imageUrl: `data:${contentType};base64,${imageBuffer.toString('base64')}`,
+      imageType,
+      imageStyle,
+      model
+    });
+  } catch (error) {
+    logger.warn('Image generation failed:', error.message);
+    throw new UserFacingError(
+      error.name === 'AbortError'
+        ? 'A imagem demorou demais. Tente novamente.'
+        : 'O gerador de imagens está indisponível agora. Tente novamente em alguns minutos.'
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function decodeUploadedFile(body) {
+  const name = String(body.name || 'arquivo').replace(/[^\p{L}\p{N}._ -]/gu, '').slice(0, 120);
+  const mime = String(body.mime || 'application/octet-stream').slice(0, 120);
+  const base64 = String(body.data || '');
+  if (!base64 || !/^[A-Za-z0-9+/=\r\n]+$/.test(base64)) {
+    throw new UserFacingError('O arquivo enviado é inválido.');
+  }
+  const buffer = Buffer.from(base64, 'base64');
+  if (!buffer.length || buffer.length > 4 * 1024 * 1024) {
+    throw new UserFacingError('Envie um arquivo de até 4 MB.');
+  }
+  return { name, mime, buffer };
+}
+
+async function analyzeUploadedImage(name, mime, buffer, question) {
+  const apiKey = process.env.MISTRAL_API_KEY;
+  if (!apiKey) throw new UserFacingError('A análise de imagens precisa da chave MISTRAL_API_KEY no Render.');
+
+  const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: process.env.MISTRAL_VISION_MODEL || 'mistral-small-latest',
+      max_tokens: 900,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: `${question || 'Analise esta imagem com detalhes e explique em português simples.'}\nNome do arquivo: ${name}`
+          },
+          {
+            type: 'image_url',
+            image_url: `data:${mime};base64,${buffer.toString('base64')}`
+          }
+        ]
+      }]
+    })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new UserFacingError('Não consegui analisar essa imagem agora.');
+  return String(data.choices?.[0]?.message?.content || '').trim();
+}
+
+async function handleAlyFile(req, res) {
+  const body = await readJsonBody(req, 6 * 1024 * 1024);
+  const { name, mime, buffer } = decodeUploadedFile(body);
+  const extension = path.extname(name).toLowerCase();
+  const question = String(body.question || '').trim().slice(0, 600);
+
+  if (mime.startsWith('image/') || ['.png', '.jpg', '.jpeg', '.webp', '.gif'].includes(extension)) {
+    const analysis = await analyzeUploadedImage(name, mime, buffer, question);
+    sendJson(res, 200, { ok: true, name, kind: 'image', analysis });
+    return;
+  }
+
+  let text = '';
+  if (extension === '.pdf' || mime === 'application/pdf') {
+    const pdfParse = require('pdf-parse');
+    const parsed = await pdfParse(buffer);
+    text = parsed.text || '';
+  } else if (
+    mime.startsWith('text/') ||
+    ['.txt', '.md', '.csv', '.json', '.js', '.html', '.css'].includes(extension)
+  ) {
+    text = buffer.toString('utf8');
+  } else {
+    throw new UserFacingError('Use PDF, TXT, Markdown, CSV, JSON ou uma imagem.');
+  }
+
+  text = text.replace(/\0/g, '').trim();
+  if (!text) throw new UserFacingError('Não encontrei texto legível nesse arquivo.');
+  sendJson(res, 200, {
+    ok: true,
+    name,
+    kind: 'document',
+    text: text.slice(0, 18000),
+    truncated: text.length > 18000
+  });
 }
 
 async function handleTunnelRestart(req, res) {
@@ -264,6 +384,17 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/aly-image') {
       if (!apiLimiter.check(req, res)) return;
       await handleAlyImage(req, res);
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/aly-file') {
+      if (!apiLimiter.check(req, res)) return;
+      await handleAlyFile(req, res);
+      return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/ai-status') {
+      sendJson(res, 200, getProviderStatus());
       return;
     }
 
