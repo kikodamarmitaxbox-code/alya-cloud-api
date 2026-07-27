@@ -214,7 +214,7 @@ function appendMessage(role, content) {
 }
 
 function getImageRequestFromChat(text) {
-  const cleaned = String(text || '').trim();
+  const cleaned = String(text || '').trim().replace(/^["'“”]+|["'“”]+$/g, '').trim();
   const match = cleaned.match(/^(?:cria|crie|faz|faça|gera|gere|desenha|desenhe)\s+(?:uma?\s+)?(?:imagem|foto|avatar|banner|arte|desenho)\s*(?:de|do|da|com)?\s*(.+)$/i);
   if (!match?.[1]?.trim()) return null;
 
