@@ -2,11 +2,10 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const cors = require('cors');
 const { spawn } = require('child_process');
 
 const logger = require('./lib/logger');
-const { isAuthenticated, hasSitePassword, validateLogin, setAuthCookie, clearAuthCookie, readSiteUsers, authCookieName } = require('./lib/auth');
+const { isAuthenticated, hasSitePassword, validateLogin, setAuthCookie, clearAuthCookie, readSiteUsers, getAuthenticatedUsername } = require('./lib/auth');
 const { askAssistant, askAssistantStream, normalizeSettings, getProviderStatus } = require('./lib/chat');
 const { handleWhatsappReceive, handleWhatsappApprove, handleWhatsappCancel, getWhatsappQueue, readWhatsappLog } = require('./lib/whatsapp');
 const { DiscordManager } = require('./lib/discord');
@@ -18,10 +17,12 @@ const { listFiles, readFile, writeFile, executeCommand, installDependency, creat
 const memory = require('./lib/memory');
 const pluginManager = require('./lib/plugins');
 const { searchWeb, shouldSearchWeb } = require('./lib/webSearch');
-const { apiLimiter, authLimiter } = require('./lib/rateLimit');
+const { apiLimiter, authLimiter, expensiveLimiter } = require('./lib/rateLimit');
 const { createUser, deleteUser, listUsers, getUser } = require('./lib/users');
 const notifications = require('./lib/notifications');
 const computerControl = require('./lib/computerControl');
+const persistentStore = require('./lib/persistentStore');
+const metrics = require('./lib/metrics');
 
 const root = __dirname;
 const publicDir = path.join(root, 'public');
@@ -150,6 +151,7 @@ async function handleAlyStatus(req, res) {
 }
 
 async function handleAlyImage(req, res) {
+  metrics.increment('imageRequests');
   const body = await readJsonBody(req);
   const prompt = String(body.prompt || '').trim().replace(/\s+/g, ' ').slice(0, 600);
   const imageType = ['avatar', 'banner', 'personagem'].includes(body.type) ? body.type : 'personagem';
@@ -263,6 +265,7 @@ async function analyzeUploadedImage(name, mime, buffer, question) {
 }
 
 async function handleAlyFile(req, res) {
+  metrics.increment('fileUploads');
   const body = await readJsonBody(req, 6 * 1024 * 1024);
   const { name, mime, buffer } = decodeUploadedFile(body);
   const extension = path.extname(name).toLowerCase();
@@ -321,30 +324,53 @@ loadLocalEnv();
 
 const discordStorage = new FileStorage(path.join(__dirname, 'nova-data', 'discord'));
 const discordManager = new DiscordManager({ storage: discordStorage });
-discordManager.init().catch((error) => logger.error('Discord init error:', error));
 
 const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon'
 };
 
-const corsMiddleware = cors({
-  origin: process.env.CORS_ORIGIN || '*',
-  credentials: true
-});
+function originAllowed(req, origin) {
+  if (!origin) return true;
+  try {
+    const originUrl = new URL(origin);
+    if (originUrl.host === req.headers.host) return true;
+    const configured = String(process.env.CORS_ORIGIN || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    return configured.includes(origin);
+  } catch {
+    return false;
+  }
+}
+
+function applySecurityHeaders(req, res, origin) {
+  res.setHeader('Access-Control-Allow-Origin', origin || `https://${req.headers.host || 'localhost'}`);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), geolocation=(), payment=()');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+}
 
 const server = http.createServer(async (req, res) => {
   try {
-    // Configuração universal de CORS para suporte a qualquer origem, protocolo e porta
     const origin = req.headers.origin || '*';
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    if (!originAllowed(req, req.headers.origin)) {
+      res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: 'Origem não autorizada.' }));
+      return;
+    }
+    applySecurityHeaders(req, res, req.headers.origin);
 
     // Resposta imediata 204 No Content para preflight OPTIONS do navegador
     if (req.method === 'OPTIONS') {
@@ -371,30 +397,54 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && url.pathname === '/api/aly-chat') {
       if (!apiLimiter.check(req, res)) return;
+      if (!requireAuth(req, res)) return;
       await handleAlyChat(req, res);
       return;
     }
 
     if (req.method === 'POST' && url.pathname === '/api/aly-chat-stream') {
       if (!apiLimiter.check(req, res)) return;
+      if (!requireAuth(req, res)) return;
       await handleAlyChatStream(req, res);
       return;
     }
 
     if (req.method === 'POST' && url.pathname === '/api/aly-image') {
-      if (!apiLimiter.check(req, res)) return;
+      if (!expensiveLimiter.check(req, res)) return;
+      if (!requireAuth(req, res)) return;
       await handleAlyImage(req, res);
       return;
     }
 
     if (req.method === 'POST' && url.pathname === '/api/aly-file') {
-      if (!apiLimiter.check(req, res)) return;
+      if (!expensiveLimiter.check(req, res)) return;
+      if (!requireAuth(req, res)) return;
       await handleAlyFile(req, res);
       return;
     }
 
     if (req.method === 'GET' && url.pathname === '/api/ai-status') {
       sendJson(res, 200, getProviderStatus());
+      return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/system-dashboard') {
+      if (!requireAuth(req, res)) return;
+      sendJson(res, 200, {
+        ok: true,
+        providers: getProviderStatus(),
+        storage: persistentStore.getStatus(),
+        usage: metrics.snapshot(),
+        discord: {
+          enabled: discordManager.enabled,
+          ready: discordManager.isReady()
+        },
+        service: {
+          uptimeSeconds: Math.round(process.uptime()),
+          environment: process.env.RENDER ? 'Render' : 'Local',
+          version: '2.1.0'
+        }
+      });
       return;
     }
 
@@ -437,10 +487,11 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && url.pathname === '/api/auth/status') {
       const users = readSiteUsers();
+      const hasUsers = users.length > 0 || listUsers().length > 0;
       sendJson(res, 200, {
         protected: hasSitePassword(),
         authenticated: isAuthenticated(req),
-        loginMode: users.length > 0 ? 'users' : hasSitePassword() ? 'password' : 'none'
+        loginMode: hasUsers ? 'users' : hasSitePassword() ? 'password' : 'none'
       });
       return;
     }
@@ -453,6 +504,10 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && url.pathname === '/api/auth/register') {
       if (!authLimiter.check(req, res)) return;
+      if (process.env.ALLOW_SELF_REGISTRATION !== 'true' && !isAuthenticated(req)) {
+        sendJson(res, 403, { error: 'Criação pública de contas está desativada.' });
+        return;
+      }
       const body = await readJsonBody(req);
       const username = String(body.username || '').trim();
       const password = String(body.password || '').trim();
@@ -467,8 +522,8 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      if (password.length < 4) {
-        sendJson(res, 400, { error: 'A senha deve ter pelo menos 4 caracteres.' });
+      if (password.length < 8) {
+        sendJson(res, 400, { error: 'A senha deve ter pelo menos 8 caracteres.' });
         return;
       }
 
@@ -859,7 +914,10 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(port, '0.0.0.0', async () => {
+async function startApplication() {
+  await persistentStore.init();
+  await discordManager.init().catch((error) => logger.error('Discord init error:', error));
+  server.listen(port, '0.0.0.0', async () => {
   logger.info(`Assistente pronto em http://localhost:${port}`);
   notifications.createNotification({
     title: 'Servidor Alya Inicializado',
@@ -885,6 +943,12 @@ server.listen(port, '0.0.0.0', async () => {
   }, 24 * 60 * 60 * 1000);
 
   discordManager.start().catch((error) => logger.error('Discord start error:', error));
+  });
+}
+
+startApplication().catch((error) => {
+  logger.error('Application startup failed:', error);
+  process.exit(1);
 });
 
 server.on('error', (error) => {
@@ -939,7 +1003,6 @@ function requireAuth(req, res) {
 }
 
 async function handleLogin(req, res) {
-  loadLocalEnv(true);
   const body = await readJsonBody(req);
   const users = readSiteUsers();
 
@@ -951,15 +1014,17 @@ async function handleLogin(req, res) {
   const result = await validateLogin(body.username, body.password);
 
   if (!result.success) {
+    metrics.increment('loginFailures');
     sendJson(res, 401, { error: result.error });
     return;
   }
 
+  metrics.increment('loginSuccesses');
   setAuthCookie(res, result.user);
   sendJson(res, 200, {
     ok: true,
     protected: true,
-    loginMode: users.length > 0 ? 'users' : 'password',
+    loginMode: users.length > 0 || listUsers().length > 0 ? 'users' : 'password',
     user: result.user
   });
 }
@@ -1019,6 +1084,7 @@ function normalizeAlyReply(reply) {
 }
 
 async function handleAlyChat(req, res) {
+  metrics.increment('chatRequests');
   const body = await readJsonBody(req);
   const messages = Array.isArray(body.messages) ? body.messages : [];
   const safeMessages = messages
@@ -1035,7 +1101,7 @@ async function handleAlyChat(req, res) {
   }
 
   const lastUserMsg = safeMessages[safeMessages.length - 1]?.content || '';
-  const userId = 'public';
+  const userId = getCurrentUserId(req);
 
   // Extração inteligente de memória em background
   memory.extractSmartMemories(userId, lastUserMsg);
@@ -1079,8 +1145,10 @@ async function handleAlyChat(req, res) {
       }
     }
 
+    metrics.increment('chatSuccesses');
     sendJson(res, 200, { reply });
   } catch (error) {
+    metrics.increment('chatErrors');
     logger.error('Aly chat error:', error);
     const message = /limite gratuito de hoje/i.test(error.message || '') ? error.message : fallbackReply;
     sendJson(res, 200, { reply: message });
@@ -1088,6 +1156,7 @@ async function handleAlyChat(req, res) {
 }
 
 async function handleAlyChatStream(req, res) {
+  metrics.increment('chatRequests');
   const body = await readJsonBody(req);
   const messages = Array.isArray(body.messages) ? body.messages : [];
   const safeMessages = messages
@@ -1104,7 +1173,7 @@ async function handleAlyChatStream(req, res) {
   }
 
   const lastUserMsg = safeMessages[safeMessages.length - 1]?.content || '';
-  const userId = 'public';
+  const userId = getCurrentUserId(req);
 
   // Extração inteligente de memória em background
   memory.extractSmartMemories(userId, lastUserMsg);
@@ -1134,6 +1203,7 @@ async function handleAlyChatStream(req, res) {
   }
 
   await askAssistantStream(safeMessages, settings, res, memoryContext);
+  metrics.increment('chatSuccesses');
 }
 
 function serveAlyStatic(res) {
@@ -1367,16 +1437,7 @@ async function handleRestoreBackup(req) {
 }
 
 function getCurrentUserId(req) {
-  const cookie = req.headers.cookie || '';
-  const match = cookie.match(new RegExp(`${authCookieName}=([^;]+)`));
-  if (!match) return 'anonymous';
-  try {
-    const token = decodeURIComponent(match[1]);
-    const username = String(token || '').split('.')[0];
-    return username || 'anonymous';
-  } catch {
-    return 'anonymous';
-  }
+  return getAuthenticatedUsername(req) || 'anonymous';
 }
 
 async function handleMemoryRemember(req, res) {

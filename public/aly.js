@@ -70,6 +70,20 @@ const removeAttachmentButton = document.querySelector('#removeAttachmentButton')
 const modelStatusPill = document.querySelector('#modelStatusPill');
 const modelStatusText = document.querySelector('#modelStatusText');
 const toastContainer = document.querySelector('#toastContainer');
+const systemButton = document.querySelector('#systemButton');
+const systemModal = document.querySelector('#systemModal');
+const closeSystemButton = document.querySelector('#closeSystemButton');
+const refreshSystemButton = document.querySelector('#refreshSystemButton');
+const systemOverview = document.querySelector('#systemOverview');
+const systemProviders = document.querySelector('#systemProviders');
+const installAppButton = document.querySelector('#installAppButton');
+const authModal = document.querySelector('#authModal');
+const authForm = document.querySelector('#authForm');
+const authUsernameLabel = document.querySelector('#authUsernameLabel');
+const authUsername = document.querySelector('#authUsername');
+const authPassword = document.querySelector('#authPassword');
+const authSubmitButton = document.querySelector('#authSubmitButton');
+const authStatus = document.querySelector('#authStatus');
 
 const storageKey = 'nova-chat-history';
 const settingsKey = 'nova-settings';
@@ -91,6 +105,8 @@ let pendingComputerApproval = null;
 let voiceRecognition = null;
 let pendingAttachment = null;
 let previousProviderSignature = '';
+let deferredInstallPrompt = null;
+let authMode = 'none';
 
 const providerLabels = {
   openrouter: 'OpenRouter',
@@ -110,6 +126,127 @@ function showToast(message, kind = 'info') {
   toast.textContent = message;
   toastContainer.appendChild(toast);
   setTimeout(() => toast.remove(), 5200);
+}
+
+function showAuthModal(message = '') {
+  if (!authModal) return;
+  authModal.hidden = false;
+  authStatus.textContent = message;
+  authUsernameLabel.hidden = authMode !== 'users';
+  setTimeout(() => (authMode === 'users' ? authUsername : authPassword)?.focus(), 50);
+}
+
+async function checkAuthentication() {
+  try {
+    const response = await fetch(`${apiBase}/api/auth/status`, {
+      cache: 'no-store',
+      credentials: 'include'
+    });
+    const data = await response.json();
+    authMode = data.loginMode || 'none';
+    if (data.protected && !data.authenticated) {
+      showAuthModal();
+      return false;
+    }
+    if (authModal) authModal.hidden = true;
+    return true;
+  } catch {
+    showAuthModal('Não consegui verificar o acesso. Tente novamente.');
+    return false;
+  }
+}
+
+async function submitAuthentication(event) {
+  event.preventDefault();
+  authSubmitButton.disabled = true;
+  authStatus.textContent = 'Verificando...';
+  try {
+    const response = await fetch(`${apiBase}/api/auth/login`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: authMode === 'users' ? authUsername.value.trim() : 'visitante',
+        password: authPassword.value
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.ok) throw new Error(data.error || 'Não foi possível entrar.');
+    authModal.hidden = true;
+    authPassword.value = '';
+    showToast('Acesso liberado. Bem-vindo à Alya.', 'success');
+    refreshProviderStatus(false);
+  } catch (error) {
+    authStatus.textContent = error.message || 'Usuário ou senha incorretos.';
+  } finally {
+    authSubmitButton.disabled = false;
+  }
+}
+
+function formatUptime(seconds) {
+  const value = Number(seconds || 0);
+  if (value < 60) return `${value}s`;
+  if (value < 3600) return `${Math.floor(value / 60)}min`;
+  return `${Math.floor(value / 3600)}h ${Math.floor((value % 3600) / 60)}min`;
+}
+
+async function loadSystemDashboard() {
+  if (!systemOverview || !systemProviders) return;
+  systemOverview.innerHTML = '<div class="system-loading">Verificando o sistema...</div>';
+  systemProviders.replaceChildren();
+  try {
+    const response = await fetch(`${apiBase}/api/system-dashboard`, {
+      cache: 'no-store',
+      credentials: 'include'
+    });
+    if (response.status === 401) {
+      showAuthModal('Entre novamente para abrir o painel.');
+      throw new Error('Acesso protegido.');
+    }
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Painel indisponível.');
+
+    const activeProvider = data.providers.active || data.providers.preferred;
+    const storageReady = data.storage.durable;
+    systemOverview.innerHTML = `
+      <article class="system-stat good"><span>IA principal</span><strong>${escapeHtml(providerLabels[activeProvider] || activeProvider || 'Aguardando')}</strong><small>${data.providers.switched ? 'Reserva ativada' : 'Funcionando normalmente'}</small></article>
+      <article class="system-stat ${storageReady ? 'good' : 'warning'}"><span>Banco de dados</span><strong>${storageReady ? 'Permanente' : 'Temporário'}</strong><small>${storageReady ? `${data.storage.records} registros protegidos` : 'Adicione DATABASE_URL no Render'}</small></article>
+      <article class="system-stat good"><span>Tempo online</span><strong>${formatUptime(data.service.uptimeSeconds)}</strong><small>${escapeHtml(data.service.environment)}</small></article>
+      <article class="system-stat"><span>Uso do chat</span><strong>${Number(data.usage.chatRequests || 0)}</strong><small>${Number(data.usage.chatErrors || 0)} falhas registradas</small></article>
+      <article class="system-stat"><span>Arquivos</span><strong>${Number(data.usage.fileUploads || 0)}</strong><small>envios processados</small></article>
+      <article class="system-stat ${data.discord.ready ? 'good' : ''}"><span>Discord</span><strong>${data.discord.ready ? 'Online' : data.discord.enabled ? 'Conectando' : 'Desativado'}</strong><small>situação do bot</small></article>
+    `;
+
+    for (const provider of data.providers.providers || []) {
+      const row = document.createElement('div');
+      row.className = `system-provider ${provider.configured ? (provider.ok === false ? 'down' : 'ready') : 'off'}`;
+      const label = providerLabels[provider.name] || provider.name;
+      row.innerHTML = `<i></i><span>${escapeHtml(label)}</span><small>${provider.configured ? (provider.ok === false ? 'Em espera automática' : provider.name === activeProvider ? 'Ativo agora' : 'Reserva pronta') : 'Não configurado'}</small>`;
+      systemProviders.appendChild(row);
+    }
+  } catch (error) {
+    systemOverview.innerHTML = `<div class="system-loading">${escapeHtml(error.message || 'Não consegui carregar o painel.')}</div>`;
+  }
+}
+
+function openSystemDashboard() {
+  if (!systemModal) return;
+  systemModal.hidden = false;
+  loadSystemDashboard();
+}
+
+async function installAlyaApp() {
+  if (window.matchMedia('(display-mode: standalone)').matches) {
+    showToast('A Alya já está instalada neste aparelho.', 'success');
+    return;
+  }
+  if (!deferredInstallPrompt) {
+    showToast('No celular, abra o menu do navegador e escolha “Adicionar à tela inicial”.');
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
 }
 
 async function refreshProviderStatus(notify = false) {
@@ -186,6 +323,7 @@ async function prepareAttachment(file) {
       })
     });
     const result = await response.json().catch(() => ({}));
+    if (response.status === 401) showAuthModal('Entre para enviar arquivos.');
     if (!response.ok || !result.ok) throw new Error(result.error || 'Não consegui ler o arquivo.');
 
     const context = result.kind === 'image'
@@ -358,6 +496,7 @@ async function createImageFromChat(request) {
       body: JSON.stringify(request)
     });
     const data = await response.json().catch(() => ({}));
+    if (response.status === 401) showAuthModal('Entre para criar imagens.');
     if (!response.ok || !data.imageUrl) throw new Error(data.error || 'Não consegui criar a imagem agora.');
 
     history.push({ role: 'assistant', content: '✦ Pronta! Aqui está sua imagem.', imageUrl: data.imageUrl, imagePrompt: request.prompt });
@@ -831,6 +970,10 @@ async function sendMessage(content) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
+      if (response.status === 401) {
+        showAuthModal('Sua sessão terminou. Entre novamente.');
+        throw new Error('Acesso protegido.');
+      }
     } catch (fetchErr) {
       console.warn('Streaming HTTP falhou, usando fallback normal:', fetchErr);
     }
@@ -950,6 +1093,7 @@ async function generateImage() {
       body: JSON.stringify({ prompt, type: selectedImageType, style: selectedImageStyle })
     });
     const data = await response.json().catch(() => ({}));
+    if (response.status === 401) showAuthModal('Entre para criar imagens.');
     if (!response.ok || !data.imageUrl) throw new Error(data.error || 'Não consegui criar a imagem agora.');
 
     const image = document.createElement('img');
@@ -1019,6 +1163,30 @@ document.querySelectorAll('[data-tool-prompt]').forEach((button) => {
     sendMessage(button.dataset.toolPrompt || '');
   });
 });
+
+authForm?.addEventListener('submit', submitAuthentication);
+systemButton?.addEventListener('click', openSystemDashboard);
+closeSystemButton?.addEventListener('click', () => { systemModal.hidden = true; });
+refreshSystemButton?.addEventListener('click', loadSystemDashboard);
+systemModal?.addEventListener('click', (event) => {
+  if (event.target === systemModal) systemModal.hidden = true;
+});
+installAppButton?.addEventListener('click', installAlyaApp);
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  if (installAppButton) installAppButton.hidden = false;
+});
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  showToast('Alya instalada com sucesso.', 'success');
+});
+
+if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
 
 if (imageStudioButton) imageStudioButton.addEventListener('click', openImageStudio);
 if (closeImageStudioButton) closeImageStudioButton.addEventListener('click', closeImageStudio);
@@ -1202,6 +1370,7 @@ function init() {
 
   setTimeout(async () => {
     try {
+      await checkAuthentication();
       render();
       renderSidebarConversations();
       updateConversationHeading();

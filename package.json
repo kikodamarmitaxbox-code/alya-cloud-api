@@ -11,15 +11,13 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@discordjs/opus": "^0.10.0",
     "@discordjs/voice": "^0.18.0",
     "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
     "discord.js": "^14.27.0",
-    "express-rate-limit": "^7.1.5",
-    "jspdf": "^2.5.1",
     "libsodium-wrappers": "^0.8.4",
+    "opusscript": "^0.0.8",
     "pdf-parse": "^1.1.1",
+    "pg": "^8.13.3",
     "winston": "^3.11.0"
   }
 }

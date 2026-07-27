@@ -3,7 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#151122" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Alya" />
   <title>Alya Assistente</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/images/alya-avatar.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
@@ -43,6 +50,9 @@
       </button>
       <button id="settingsButton" class="sidebar-nav-item" type="button">
         <div class="sidebar-nav-left"><span>⌘</span> <span>Configurações</span></div>
+      </button>
+      <button id="systemButton" class="sidebar-nav-item" type="button">
+        <div class="sidebar-nav-left"><span>◈</span> <span>Sistema</span></div>
       </button>
       <button id="helpButton" class="sidebar-nav-item" type="button">
         <div class="sidebar-nav-left"><span>?</span> <span>Ajuda</span></div>
@@ -192,6 +202,7 @@
           <label class="setting-item" for="settingsSoundToggle"><span>Som de inicialização</span><input id="settingsSoundToggle" type="checkbox" checked /></label>
           <label class="setting-item" for="settingsSoundVolume"><span>Volume do som</span><input id="settingsSoundVolume" type="range" min="0" max="100" value="50" /></label>
           <button id="testSoundButton" class="tool-button" type="button">Testar som</button>
+          <button id="installAppButton" class="tool-button primary" type="button">Instalar Alya no celular</button>
         </section>
         <section id="settingsChat" class="settings-tab" data-tab="chat" hidden>
           <h3>Chat</h3>
@@ -210,6 +221,34 @@
         <button id="saveSettingsButton" class="tool-button primary" type="button">Salvar</button>
       </div>
     </div>
+  </section>
+
+  <section id="systemModal" class="memory-modal" aria-label="Painel do sistema" hidden>
+    <div class="memory-card system-card">
+      <header class="memory-header">
+        <div><h2>Painel da Alya</h2><p>Funcionamento, proteção e consumo em tempo real.</p></div>
+        <button id="closeSystemButton" class="icon-button" type="button" title="Fechar">×</button>
+      </header>
+      <div id="systemOverview" class="system-overview">
+        <div class="system-loading">Verificando o sistema...</div>
+      </div>
+      <div class="system-section">
+        <div class="system-section-title"><strong>Modelos de IA</strong><button id="refreshSystemButton" class="tool-button" type="button">Atualizar</button></div>
+        <div id="systemProviders" class="system-provider-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="authModal" class="memory-modal auth-modal" aria-label="Entrar na Alya" hidden>
+    <form id="authForm" class="memory-card auth-card">
+      <div class="auth-brand">✦</div>
+      <h2>Entrar na Alya</h2>
+      <p>Este espaço é privado. Entre para continuar.</p>
+      <label id="authUsernameLabel">Usuário<input id="authUsername" type="text" autocomplete="username" maxlength="32" /></label>
+      <label>Senha<input id="authPassword" type="password" autocomplete="current-password" required /></label>
+      <button id="authSubmitButton" class="tool-button primary" type="submit">Entrar</button>
+      <p id="authStatus" class="auth-status" aria-live="polite"></p>
+    </form>
   </section>
 
   <section id="toolsModal" class="memory-modal" aria-label="Ferramentas profissionais" hidden>

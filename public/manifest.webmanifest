@@ -1,0 +1,25 @@
+{
+  "name": "Alya Assistente",
+  "short_name": "Alya",
+  "description": "Sua assistente inteligente para conversar, estudar, criar e planejar.",
+  "start_url": "/aly?source=app",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f0d19",
+  "theme_color": "#151122",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/images/alya-avatar-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/alya-avatar-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
