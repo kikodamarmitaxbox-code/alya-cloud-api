@@ -75,6 +75,7 @@ if (!currentConversationId) {
 }
 let pendingFileProfile = null;
 let selectedImageType = 'avatar';
+let selectedImageStyle = 'cinematico';
 let pendingComputerApproval = null;
 let voiceRecognition = null;
 
@@ -719,6 +720,13 @@ function setImageType(type) {
   });
 }
 
+function setImageStyle(style) {
+  selectedImageStyle = style;
+  document.querySelectorAll('.image-style-option').forEach((button) => {
+    button.classList.toggle('active', button.dataset.imageStyle === style);
+  });
+}
+
 async function generateImage() {
   const prompt = imagePrompt?.value.trim() || '';
   if (!prompt) {
@@ -737,7 +745,7 @@ async function generateImage() {
     const response = await fetch(`${apiBase}/api/aly-image`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, type: selectedImageType })
+      body: JSON.stringify({ prompt, type: selectedImageType, style: selectedImageStyle })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.imageUrl) throw new Error(data.error || 'Não consegui criar a imagem agora.');
@@ -797,6 +805,9 @@ if (imageStudioModal) imageStudioModal.addEventListener('click', (event) => {
 });
 document.querySelectorAll('.image-type-option').forEach((button) => {
   button.addEventListener('click', () => setImageType(button.dataset.imageType));
+});
+document.querySelectorAll('.image-style-option').forEach((button) => {
+  button.addEventListener('click', () => setImageStyle(button.dataset.imageStyle));
 });
 if (generateImageButton) generateImageButton.addEventListener('click', generateImage);
 

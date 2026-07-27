@@ -153,21 +153,28 @@ async function handleAlyImage(req, res) {
   const body = await readJsonBody(req);
   const prompt = String(body.prompt || '').trim().replace(/\s+/g, ' ').slice(0, 600);
   const imageType = ['avatar', 'banner', 'personagem'].includes(body.type) ? body.type : 'personagem';
+  const imageStyle = ['anime', 'cinematico', 'realista', '3d'].includes(body.style) ? body.style : 'cinematico';
 
   if (!prompt) {
     throw new UserFacingError('Descreva a imagem que você quer criar.', 400);
   }
 
   const formats = {
-    avatar: { width: 1024, height: 1024, label: 'foto de perfil quadrada' },
-    banner: { width: 1536, height: 768, label: 'banner horizontal, sem texto importante nas bordas' },
-    personagem: { width: 1024, height: 1365, label: 'personagem em retrato vertical' }
+    avatar: { width: 1024, height: 1024, label: 'foto de perfil quadrada, rosto bem enquadrado e destaque no centro' },
+    banner: { width: 1536, height: 768, label: 'banner horizontal, composição panorâmica e sem texto importante nas bordas' },
+    personagem: { width: 1024, height: 1365, label: 'personagem em retrato vertical, pose expressiva e composição elegante' }
+  };
+  const styles = {
+    anime: 'ilustração anime premium, linhas limpas, cores vibrantes, iluminação suave e acabamento profissional',
+    cinematico: 'arte cinematográfica, iluminação dramática, composição profissional, cores harmoniosas e muitos detalhes',
+    realista: 'fotografia realista de alta qualidade, textura natural, iluminação de estúdio e foco nítido',
+    '3d': 'arte 3D premium, materiais detalhados, iluminação de estúdio, profundidade e acabamento de jogo moderno'
   };
   const format = formats[imageType];
-  const fullPrompt = `${prompt}. Crie uma ${format.label}, bonita, detalhada e apropriada para todas as idades.`;
+  const fullPrompt = `${prompt}. Create a ${format.label}. ${styles[imageStyle]}. High quality, polished details, balanced composition, beautiful background, no watermark, no logo, no readable text. Appropriate for all ages.`;
   const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${format.width}&height=${format.height}&seed=${Date.now()}&nologo=true`;
 
-  sendJson(res, 200, { ok: true, imageUrl, imageType });
+  sendJson(res, 200, { ok: true, imageUrl, imageType, imageStyle });
 }
 
 async function handleTunnelRestart(req, res) {
