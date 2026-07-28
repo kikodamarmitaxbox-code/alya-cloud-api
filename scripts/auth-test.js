@@ -25,6 +25,7 @@ const {
 } = require('../lib/auth');
 const history = require('../lib/history');
 const memory = require('../lib/memory');
+const userFiles = require('../lib/userFiles');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -94,6 +95,7 @@ function cleanupUserData(username, conversationId) {
   deleteUser(username, { force: true });
   history.deleteConversationHistory(conversationId, username);
   store.remove(`memory:${username}`);
+  userFiles.deleteAllUserFiles(username);
   const memoryFile = path.join(root, 'nova-data', 'memory', `${username}.json`);
   if (fs.existsSync(memoryFile)) fs.unlinkSync(memoryFile);
 }
@@ -105,6 +107,7 @@ async function main() {
   const friend = `testfriend_${suffix}`.slice(0, 32);
   const adminPassword = crypto.randomBytes(24).toString('base64url');
   const friendPassword = crypto.randomBytes(24).toString('base64url');
+  const changedFriendPassword = crypto.randomBytes(24).toString('base64url');
   const conversationId = `isolamento_${suffix}`;
   let child = null;
 
@@ -187,6 +190,39 @@ async function main() {
     const friendMemories = await request(baseUrl, '/api/memory/all', { cookie: friendLogin.cookie });
     assert(!JSON.stringify(friendMemories.data).includes('memória exclusiva do administrador'), 'Memória vazou entre contas.');
 
+    const adminFileUpload = await request(baseUrl, '/api/aly-file', {
+      method: 'POST',
+      cookie: adminLogin.cookie,
+      headers: { 'Content-Type': 'application/json' },
+      body: {
+        name: 'arquivo-admin.txt',
+        mime: 'text/plain',
+        data: Buffer.from('arquivo exclusivo do administrador').toString('base64')
+      }
+    });
+    const friendFileUpload = await request(baseUrl, '/api/aly-file', {
+      method: 'POST',
+      cookie: friendLogin.cookie,
+      headers: { 'Content-Type': 'application/json' },
+      body: {
+        name: 'arquivo-amigo.txt',
+        mime: 'text/plain',
+        data: Buffer.from('arquivo exclusivo do amigo').toString('base64')
+      }
+    });
+    assert(adminFileUpload.status === 200 && friendFileUpload.status === 200, 'Falha ao salvar arquivos de teste.');
+    const adminFiles = await request(baseUrl, '/api/files', { cookie: adminLogin.cookie });
+    const friendFiles = await request(baseUrl, '/api/files', { cookie: friendLogin.cookie });
+    assert(adminFiles.data.files?.some((file) => file.name === 'arquivo-admin.txt'), 'Arquivo do administrador não foi salvo.');
+    assert(!adminFiles.data.files?.some((file) => file.name === 'arquivo-amigo.txt'), 'Arquivo do amigo apareceu para o administrador.');
+    assert(friendFiles.data.files?.some((file) => file.name === 'arquivo-amigo.txt'), 'Arquivo do amigo não foi salvo.');
+    const crossFile = await request(
+      baseUrl,
+      `/api/files/download?id=${adminFileUpload.data.file.id}`,
+      { cookie: friendLogin.cookie }
+    );
+    assert(crossFile.status === 404, 'Uma conta conseguiu baixar o arquivo de outra.');
+
     const logout = await request(baseUrl, '/api/auth/logout', {
       method: 'POST',
       cookie: adminLogin.cookie
@@ -205,7 +241,67 @@ async function main() {
     });
     assert(afterRestart.status === 200, 'A conta deixou de funcionar após reiniciar o servidor.');
 
-    process.stdout.write('Autenticação verificada: login, senha errada, logout, duas contas isoladas e reinício.\n');
+    const adminAfterRestart = await request(baseUrl, '/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: { username: admin, password: adminPassword }
+    });
+    const passwordChanged = await request(baseUrl, '/api/users/password', {
+      method: 'POST',
+      cookie: adminAfterRestart.cookie,
+      headers: { 'Content-Type': 'application/json' },
+      body: { username: friend, password: changedFriendPassword }
+    });
+    assert(passwordChanged.status === 200, 'Administrador não conseguiu trocar a senha.');
+    const staleSession = await request(baseUrl, '/api/files', { cookie: afterRestart.cookie });
+    assert(staleSession.status === 401, 'A sessão antiga continuou válida após trocar a senha.');
+    const oldPasswordLogin = await request(baseUrl, '/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: { username: friend, password: friendPassword }
+    });
+    const newPasswordLogin = await request(baseUrl, '/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: { username: friend, password: changedFriendPassword }
+    });
+    assert(oldPasswordLogin.status === 401 && newPasswordLogin.status === 200, 'A troca de senha não invalidou a senha antiga.');
+
+    const blockResult = await request(baseUrl, '/api/users/block', {
+      method: 'POST',
+      cookie: adminAfterRestart.cookie,
+      headers: { 'Content-Type': 'application/json' },
+      body: { username: friend, blocked: true }
+    });
+    assert(blockResult.status === 200, 'Administrador não conseguiu bloquear a conta.');
+    const blockedLogin = await request(baseUrl, '/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: { username: friend, password: changedFriendPassword }
+    });
+    assert(blockedLogin.status === 401, 'A conta bloqueada ainda conseguiu entrar.');
+    const unblockResult = await request(baseUrl, '/api/users/block', {
+      method: 'POST',
+      cookie: adminAfterRestart.cookie,
+      headers: { 'Content-Type': 'application/json' },
+      body: { username: friend, blocked: false }
+    });
+    assert(unblockResult.status === 200, 'Administrador não conseguiu desbloquear a conta.');
+    const deleteResult = await request(baseUrl, '/api/users/delete', {
+      method: 'DELETE',
+      cookie: adminAfterRestart.cookie,
+      headers: { 'Content-Type': 'application/json' },
+      body: { username: friend }
+    });
+    assert(deleteResult.status === 200, 'Administrador não conseguiu apagar a conta.');
+    const deletedLogin = await request(baseUrl, '/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: { username: friend, password: changedFriendPassword }
+    });
+    assert(deletedLogin.status !== 200, 'A conta apagada ainda conseguiu entrar.');
+
+    process.stdout.write('Autenticação verificada: contas individuais, dados e arquivos isolados, senha, bloqueio, exclusão, logout e reinício.\n');
   } finally {
     await stopServer(child);
     cleanupUserData(admin, conversationId);

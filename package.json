@@ -12,7 +12,11 @@
     "test:intelligence": "node scripts/intelligence-test.js",
     "test:auth": "node scripts/auth-test.js",
     "criar-usuario": "node scripts/create-user.js",
-    "criar-admin": "node scripts/create-user.js --admin"
+    "criar-admin": "node scripts/create-user.js --admin",
+    "trocar-senha": "node scripts/manage-user.js password",
+    "bloquear-usuario": "node scripts/manage-user.js block",
+    "desbloquear-usuario": "node scripts/manage-user.js unblock",
+    "apagar-usuario": "node scripts/manage-user.js delete"
   },
   "engines": {
     "node": ">=18"

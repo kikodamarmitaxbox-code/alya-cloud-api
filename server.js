@@ -20,13 +20,27 @@ const { DiscordManager } = require('./lib/discord');
 const FileStorage = require('./lib/storage/FileStorage');
 const { UserFacingError, sendJson, sendText, loadLocalEnv, getSafeRequest, readJsonBody } = require('./lib/utils');
 const { readDevProfile, handleApplyProfile, rotateBackups } = require('./lib/profile');
-const { saveConversationHistory, loadConversationHistory, deleteConversationHistory, listAllConversations } = require('./lib/history');
+const {
+  saveConversationHistory,
+  loadConversationHistory,
+  deleteConversationHistory,
+  listAllConversations,
+  deleteAllUserHistory
+} = require('./lib/history');
 const { listFiles, readFile, writeFile, executeCommand, installDependency, createBackup, restoreBackup } = require('./lib/fileOps');
 const memory = require('./lib/memory');
 const pluginManager = require('./lib/plugins');
 const { searchWeb, shouldSearchWeb } = require('./lib/webSearch');
 const { apiLimiter, authLimiter, expensiveLimiter } = require('./lib/rateLimit');
-const { createUser, deleteUser, listUsers, ensureBootstrapAdmin } = require('./lib/users');
+const {
+  createUser,
+  deleteUser,
+  changePassword,
+  setUserBlocked,
+  listUsers,
+  ensureBootstrapAdmin
+} = require('./lib/users');
+const userFiles = require('./lib/userFiles');
 const notifications = require('./lib/notifications');
 const computerControl = require('./lib/computerControl');
 const persistentStore = require('./lib/persistentStore');
@@ -282,7 +296,8 @@ async function handleAlyFile(req, res) {
 
   if (mime.startsWith('image/') || ['.png', '.jpg', '.jpeg', '.webp', '.gif'].includes(extension)) {
     const analysis = await analyzeUploadedImage(name, mime, buffer, question);
-    sendJson(res, 200, { ok: true, name, kind: 'image', analysis });
+    const saved = userFiles.saveUserFile(getCurrentUserId(req), name, mime, buffer);
+    sendJson(res, 200, { ok: true, name, kind: 'image', analysis, file: saved.file });
     return;
   }
 
@@ -302,10 +317,12 @@ async function handleAlyFile(req, res) {
 
   text = text.replace(/\0/g, '').trim();
   if (!text) throw new UserFacingError('Não encontrei texto legível nesse arquivo.');
+  const saved = userFiles.saveUserFile(getCurrentUserId(req), name, mime, buffer);
   sendJson(res, 200, {
     ok: true,
     name,
     kind: 'document',
+    file: saved.file,
     text: text.slice(0, 18000),
     truncated: text.length > 18000
   });
@@ -440,6 +457,35 @@ const server = http.createServer(async (req, res) => {
       if (!expensiveLimiter.check(req, res)) return;
       if (!requireAuth(req, res)) return;
       await handleAlyFile(req, res);
+      return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/files') {
+      sendJson(res, 200, { files: userFiles.listUserFiles(getCurrentUserId(req)) });
+      return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/files/download') {
+      const file = userFiles.getUserFile(getCurrentUserId(req), url.searchParams.get('id'));
+      if (!file) {
+        sendJson(res, 404, { error: 'Arquivo não encontrado.' });
+        return;
+      }
+      res.writeHead(200, {
+        'Content-Type': file.mime || 'application/octet-stream',
+        'Content-Length': file.buffer.length,
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+        'Cache-Control': 'private, no-store'
+      });
+      res.end(file.buffer);
+      return;
+    }
+
+    if (req.method === 'DELETE' && url.pathname === '/api/files') {
+      const body = await readJsonBody(req).catch(() => ({}));
+      const id = body.id || url.searchParams.get('id');
+      const removed = userFiles.deleteUserFile(getCurrentUserId(req), id);
+      sendJson(res, removed ? 200 : 404, removed ? { ok: true } : { error: 'Arquivo não encontrado.' });
       return;
     }
 
@@ -708,6 +754,16 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'DELETE' && url.pathname === '/api/users/delete') {
       if (!requireAuth(req, res)) return;
       await handleDeleteUser(req, res);
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/users/password') {
+      await handleChangeUserPassword(req, res);
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/users/block') {
+      await handleBlockUser(req, res);
       return;
     }
 
@@ -1805,13 +1861,32 @@ async function handleDeleteUser(req, res) {
     return;
   }
 
-  const result = deleteUser(username);
+  const result = deleteUser(username, {
+    actorUsername: getAuthenticatedUsername(req)
+  });
 
   if (result.ok) {
+    deleteAllUserHistory(result.username);
+    memory.deleteAllUserMemory(result.username);
+    userFiles.deleteAllUserFiles(result.username);
     sendJson(res, 200, result);
   } else {
     sendJson(res, 400, { error: result.error });
   }
+}
+
+async function handleChangeUserPassword(req, res) {
+  const body = await readJsonBody(req);
+  const result = await changePassword(body.username, body.password);
+  sendJson(res, result.ok ? 200 : 400, result.ok ? result : { error: result.error });
+}
+
+async function handleBlockUser(req, res) {
+  const body = await readJsonBody(req);
+  const result = setUserBlocked(body.username, body.blocked !== false, {
+    actorUsername: getAuthenticatedUsername(req)
+  });
+  sendJson(res, result.ok ? 200 : 400, result.ok ? result : { error: result.error });
 }
 
 process.on('uncaughtException', (error) => {
