@@ -1399,12 +1399,19 @@ function serveGameStatic(res) {
 }
 
 async function handleHealthCheck(req, res) {
+  const providerStatus = getProviderStatus();
+  const configuredProviders = providerStatus.providers
+    .filter((provider) => provider.configured)
+    .map((provider) => provider.name);
   const health = {
     ok: true,
     name: 'Alya',
     version: '2.0.0',
     timestamp: new Date().toISOString(),
     dependencies: {
+      ai: configuredProviders.length > 0,
+      preferredProvider: providerStatus.preferred,
+      configuredProviders,
       openrouter: !!process.env.OPENROUTER_API_KEY,
       gemini: !!process.env.GEMINI_API_KEY
     },
