@@ -63,6 +63,7 @@ async function verifySafety() {
     throw new Error('A Code Alya não conseguiu ler o projeto.');
   }
   if (
+    typeof codeAgent.parseModelPlan !== 'function' ||
     typeof codeAgent.getActionHistory !== 'function' ||
     typeof codeAgent.undoCodeAction !== 'function' ||
     typeof codeAgent.listProjects !== 'function' ||
@@ -74,6 +75,12 @@ async function verifySafety() {
   }
   if (!codeAgent.listProjects().some((project) => project.id === 'main')) {
     throw new Error('O projeto principal da Code Alya não está disponível.');
+  }
+  const recoveredPlan = codeAgent.parseModelPlan(
+    'texto antes {"summary":"Plano recuperado","actions":[{"type":"done"}]} texto depois {inválido}'
+  );
+  if (recoveredPlan.summary !== 'Plano recuperado' || recoveredPlan.actions.length !== 1) {
+    throw new Error('A Code Alya não recuperou uma resposta com texto extra.');
   }
 
   const testProjectName = `Verificação Alya ${Date.now()}`;
