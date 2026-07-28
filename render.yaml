@@ -26,6 +26,6 @@ services:
       - key: DISCORD_CLIENT_ID
         sync: false
       - key: DISCORD_ENABLED
-        value: "false"
+        value: "true"
       - key: DISCORD_APPROVAL_REQUIRED
         value: "false"
