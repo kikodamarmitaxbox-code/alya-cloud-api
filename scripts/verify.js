@@ -64,9 +64,16 @@ async function verifySafety() {
   }
   if (
     typeof codeAgent.getActionHistory !== 'function' ||
-    typeof codeAgent.undoCodeAction !== 'function'
+    typeof codeAgent.undoCodeAction !== 'function' ||
+    typeof codeAgent.listProjects !== 'function' ||
+    typeof codeAgent.createProject !== 'function' ||
+    typeof codeAgent.diagnoseProject !== 'function' ||
+    typeof codeAgent.continueCodeSession !== 'function'
   ) {
-    throw new Error('O histórico ou o recurso de desfazer da Code Alya não está disponível.');
+    throw new Error('Um recurso profissional da Code Alya não está disponível.');
+  }
+  if (!codeAgent.listProjects().some((project) => project.id === 'main')) {
+    throw new Error('O projeto principal da Code Alya não está disponível.');
   }
 
   const command = await codeAgent.runSafeCommand('node --check server.js');

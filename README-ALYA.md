@@ -54,6 +54,12 @@ guarda a conversa neste navegador, registra as ações e oferece o botão **↶*
 desfazer a última alteração. Se uma escrita falhar no meio, os arquivos já
 tocados voltam automaticamente à versão anterior.
 
+O seletor no topo permite criar e alternar entre projetos separados. O botão
+**Diagnóstico inteligente** executa verificações reais antes de explicar a causa
+e preparar a correção. No **Automático supervisionado**, a Code Alya continua a
+tarefa em até seis etapas, mas sempre para e pede aprovação antes de aplicar o
+próximo plano.
+
 A Code Alya tenta primeiro o provedor escolhido em `AI_PROVIDER` ou
 `ALYA_CODE_PROVIDER` e troca automaticamente quando ele não responde. `.env`,
 chaves e pastas internas permanecem bloqueados. Use `npm run verify` para

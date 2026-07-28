@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/code-alya.css?v=20260728a" />
+  <link rel="stylesheet" href="/code-alya.css?v=20260728b" />
 </head>
 <body>
   <div class="code-app">
@@ -23,8 +23,10 @@
       </div>
       <div class="topbar-center">
         <span class="project-dot"></span>
-        <span id="projectName">Carregando projeto...</span>
-        <span class="branch-pill">⑂ main</span>
+        <select id="projectSelect" aria-label="Projeto atual">
+          <option value="main">Carregando projeto...</option>
+        </select>
+        <button id="newProjectButton" class="project-add-button" type="button">＋ Projeto</button>
       </div>
       <div class="topbar-actions">
         <span id="modelBadge" class="model-badge"><i></i> Verificando modelo</span>
@@ -131,6 +133,7 @@
           <div class="starter-grid">
             <button type="button" data-code-prompt="Crie uma página moderna e responsiva para este projeto."><span>✦</span><div><strong>Criar uma página</strong><small>Interface completa</small></div></button>
             <button type="button" data-code-prompt="Analise o projeto, encontre o erro mais importante e prepare a correção."><span>⚡</span><div><strong>Corrigir um erro</strong><small>Analisar e reparar</small></div></button>
+            <button id="diagnoseButton" class="diagnose-starter" type="button"><span>◉</span><div><strong>Diagnóstico inteligente</strong><small>Executar testes e encontrar a causa</small></div></button>
           </div>
         </div>
 
@@ -139,7 +142,13 @@
           <div id="contextFiles"></div>
         </div>
 
-        <div class="agent-capabilities"><span>Modo agente</span><i>Arquivos</i><i>Testes</i><i>Pacotes</i><i>Git</i></div>
+        <div class="agent-capabilities">
+          <span>Modo agente</span><i>Arquivos</i><i>Testes</i><i>Pacotes</i><i>Git</i>
+          <label class="supervised-toggle" title="Continua em etapas e pede aprovação antes das ações">
+            <input id="autoModeToggle" type="checkbox" checked />
+            <b></b><em>Automático supervisionado</em>
+          </label>
+        </div>
 
         <form id="codeChatForm" class="chat-composer">
           <textarea id="codePromptInput" rows="3" placeholder="Peça para a Code Alya programar..." maxlength="4000"></textarea>
@@ -153,6 +162,6 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/code-alya.js?v=20260728a"></script>
+  <script src="/code-alya.js?v=20260728b"></script>
 </body>
 </html>

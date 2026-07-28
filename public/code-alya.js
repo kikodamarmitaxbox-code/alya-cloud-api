@@ -1,6 +1,8 @@
 'use strict';
 
 const CHAT_STORAGE_KEY = 'code-alya-chat-v1';
+const PROJECT_STORAGE_KEY = 'code-alya-project-v1';
+const AUTO_MODE_STORAGE_KEY = 'code-alya-supervised-v1';
 const WELCOME_MESSAGE = 'Oi, Pedro! Me conta o que você quer criar. Eu converso com você, analiso o projeto e programo quando você pedir.';
 
 function loadStoredChatHistory() {
@@ -28,10 +30,13 @@ const state = {
   busy: false,
   terminalOpen: true,
   lastActionId: '',
+  projectId: localStorage.getItem(PROJECT_STORAGE_KEY) || 'main',
+  autoMode: localStorage.getItem(AUTO_MODE_STORAGE_KEY) !== 'false',
   chatHistory: loadStoredChatHistory()
 };
 
-const projectName = document.querySelector('#projectName');
+const projectSelect = document.querySelector('#projectSelect');
+const newProjectButton = document.querySelector('#newProjectButton');
 const modelBadge = document.querySelector('#modelBadge');
 const fileTree = document.querySelector('#fileTree');
 const fileSearchInput = document.querySelector('#fileSearchInput');
@@ -57,6 +62,8 @@ const toast = document.querySelector('#toast');
 const assistantPanel = document.querySelector('#assistantPanel');
 const undoLastButton = document.querySelector('#undoLastButton');
 const newChatButton = document.querySelector('#newChatButton');
+const diagnoseButton = document.querySelector('#diagnoseButton');
+const autoModeToggle = document.querySelector('#autoModeToggle');
 
 function persistChatHistory() {
   try {
@@ -109,9 +116,11 @@ function showToast(message, type = '') {
 async function loadWorkspace() {
   fileTree.innerHTML = '<div class="tree-loading"><span></span><span></span><span></span></div>';
   try {
-    const data = await api('/api/code-alya/workspace');
+    const data = await api(`/api/code-alya/workspace?project=${encodeURIComponent(state.projectId)}`);
     state.workspace = data;
-    projectName.textContent = data.name;
+    state.projectId = data.projectId;
+    projectSelect.value = data.projectId;
+    localStorage.setItem(PROJECT_STORAGE_KEY, data.projectId);
     modelBadge.innerHTML = `<i></i>${escapeHtml(data.model)}`;
     renderTree();
     await loadActionHistory();
@@ -124,7 +133,7 @@ async function loadWorkspace() {
 
 async function loadActionHistory() {
   try {
-    const data = await api('/api/code-alya/history?limit=12');
+    const data = await api(`/api/code-alya/history?limit=12&project=${encodeURIComponent(state.projectId)}`);
     const undoable = (data.actions || []).find((entry) => entry.canUndo);
     state.lastActionId = undoable?.id || '';
     undoLastButton.disabled = !state.lastActionId;
@@ -134,6 +143,54 @@ async function loadActionHistory() {
   } catch {
     state.lastActionId = '';
     undoLastButton.disabled = true;
+  }
+}
+
+async function loadProjects() {
+  const data = await api('/api/code-alya/projects');
+  const projects = data.projects || [];
+  if (!projects.some((project) => project.id === state.projectId)) state.projectId = 'main';
+  projectSelect.innerHTML = projects.map((project) => (
+    `<option value="${escapeHtml(project.id)}">${escapeHtml(project.name)}</option>`
+  )).join('');
+  projectSelect.value = state.projectId;
+  await loadWorkspace();
+}
+
+function hasDirtyFiles() {
+  return [...state.openFiles.values()].some((file) => file.dirty);
+}
+
+async function switchProject(projectId) {
+  if (hasDirtyFiles() && !window.confirm('Trocar de projeto sem salvar as mudanças abertas?')) {
+    projectSelect.value = state.projectId;
+    return;
+  }
+  state.projectId = projectId;
+  state.openFiles.clear();
+  state.activePath = '';
+  state.workspace = null;
+  localStorage.setItem(PROJECT_STORAGE_KEY, projectId);
+  renderEditor();
+  await loadWorkspace();
+}
+
+async function createNewProject() {
+  const name = window.prompt('Qual será o nome do novo projeto?');
+  if (!String(name || '').trim()) return;
+  newProjectButton.disabled = true;
+  try {
+    const data = await api('/api/code-alya/projects', {
+      method: 'POST',
+      body: JSON.stringify({ name })
+    });
+    await loadProjects();
+    await switchProject(data.project.id);
+    showToast(`Projeto “${data.project.name}” criado.`);
+  } catch (error) {
+    showToast(error.message, 'error');
+  } finally {
+    newProjectButton.disabled = false;
   }
 }
 
@@ -198,7 +255,7 @@ function renderTree(filter = '') {
 async function openFile(filePath) {
   try {
     if (!state.openFiles.has(filePath)) {
-      const data = await api(`/api/code-alya/file?path=${encodeURIComponent(filePath)}`);
+      const data = await api(`/api/code-alya/file?path=${encodeURIComponent(filePath)}&project=${encodeURIComponent(state.projectId)}`);
       state.openFiles.set(filePath, {
         path: filePath,
         content: data.content,
@@ -284,7 +341,11 @@ async function saveActiveFile() {
   try {
     const data = await api('/api/code-alya/file', {
       method: 'POST',
-      body: JSON.stringify({ path: file.path, content: file.content })
+      body: JSON.stringify({
+        path: file.path,
+        content: file.content,
+        projectId: state.projectId
+      })
     });
     state.lastActionId = data.actionId || state.lastActionId;
     undoLastButton.disabled = !state.lastActionId;
@@ -334,13 +395,19 @@ function restoreChatHistory() {
 
 function renderPlan(data) {
   modelBadge.innerHTML = `<i></i>${escapeHtml(data.model)}`;
+  if (data.sessionComplete || !data.planId) {
+    addMessage('assistant', data.summary || 'Tarefa concluída.');
+    rememberMessage('assistant', data.summary || 'Tarefa concluída.');
+    return;
+  }
+  const actions = Array.isArray(data.actions) ? data.actions : [];
   const previews = new Map((data.preview || []).map((preview) => [preview.path, preview]));
-  const hasWrites = data.actions.some((action) => action.type === 'write');
-  const hasImportantCommand = data.actions.some((action) => (
+  const hasWrites = actions.some((action) => action.type === 'write');
+  const hasImportantCommand = actions.some((action) => (
     action.type === 'command' &&
     /^(?:npm\s+install|git\s+(?:commit|push))\b/i.test(action.command || '')
   ));
-  const actionsHtml = data.actions.map((action) => {
+  const actionsHtml = actions.map((action) => {
     if (action.type === 'write') {
       const preview = previews.get(action.path);
       const changeLabel = preview?.status === 'create'
@@ -364,7 +431,7 @@ function renderPlan(data) {
     ? `<div class="plan-card">
         <div class="plan-head"><strong>${hasWrites ? 'Revisão pronta' : 'Verificações prontas'}</strong><span>${escapeHtml(data.model)}</span></div>
         <div class="plan-actions">${actionsHtml}</div>
-        <button class="plan-apply" type="button" data-plan="${escapeHtml(data.planId)}" data-has-writes="${hasWrites}" data-important-command="${hasImportantCommand}">
+        <button class="plan-apply" type="button" data-plan="${escapeHtml(data.planId)}" data-session="${escapeHtml(data.sessionId || '')}" data-has-writes="${hasWrites}" data-important-command="${hasImportantCommand}">
           ${hasWrites ? 'Aplicar com backup' : 'Executar verificações'}
         </button>
       </div>`
@@ -389,7 +456,9 @@ async function sendCodeRequest(message) {
       body: JSON.stringify({
         message: clean,
         contextFiles: [...state.openFiles.keys()],
-        history: state.chatHistory
+        history: state.chatHistory,
+        projectId: state.projectId,
+        autoMode: state.autoMode
       })
     });
     thinking.remove();
@@ -447,10 +516,68 @@ async function applyPlan(event) {
     rememberMessage('assistant', resultMessage);
     await loadWorkspace();
     showToast(hasWrites ? 'Mudanças aplicadas com backup automático.' : 'Verificações concluídas.');
+    if (data.canContinue && state.autoMode && data.sessionId) {
+      await continueSupervisedSession(data.sessionId);
+    }
   } catch (error) {
     button.disabled = false;
     button.textContent = hasWrites ? 'Tentar aplicar novamente' : 'Tentar verificar novamente';
     showToast(error.message, 'error');
+  }
+}
+
+async function continueSupervisedSession(sessionId) {
+  const progressMessage = 'Etapa aprovada e concluída. Vou analisar o resultado real e preparar a próxima etapa.';
+  addMessage('assistant', progressMessage);
+  rememberMessage('assistant', progressMessage);
+  const thinking = addThinking();
+  try {
+    const data = await api('/api/code-alya/continue', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId })
+    });
+    thinking.remove();
+    renderPlan(data);
+  } catch (error) {
+    thinking.remove();
+    addMessage('assistant', error.message);
+    rememberMessage('assistant', error.message);
+    showToast(error.message, 'error');
+  }
+}
+
+async function runSmartDiagnosis() {
+  if (state.busy) return;
+  state.busy = true;
+  diagnoseButton.disabled = true;
+  sendCodeButton.disabled = true;
+  const requestMessage = `Faça um diagnóstico inteligente do projeto “${state.workspace?.name || state.projectId}”.`;
+  addMessage('user', requestMessage);
+  rememberMessage('user', requestMessage);
+  const thinking = addThinking();
+  try {
+    const data = await api('/api/code-alya/diagnose', {
+      method: 'POST',
+      body: JSON.stringify({
+        projectId: state.projectId,
+        history: state.chatHistory
+      })
+    });
+    thinking.remove();
+    for (const result of data.diagnostics || []) {
+      appendTerminal(`$ ${result.command}`, 'terminal-command');
+      appendTerminal(result.output || (result.ok ? 'Concluído sem erros.' : 'Falhou.'), result.ok ? '' : 'terminal-error');
+    }
+    renderPlan(data);
+  } catch (error) {
+    thinking.remove();
+    addMessage('assistant', error.message);
+    rememberMessage('assistant', error.message);
+    showToast(error.message, 'error');
+  } finally {
+    state.busy = false;
+    diagnoseButton.disabled = false;
+    sendCodeButton.disabled = false;
   }
 }
 
@@ -509,7 +636,7 @@ async function runTerminalCommand(command) {
   try {
     const data = await api('/api/code-alya/command', {
       method: 'POST',
-      body: JSON.stringify({ command: clean })
+      body: JSON.stringify({ command: clean, projectId: state.projectId })
     });
     appendTerminal(data.output || 'Concluído.');
   } catch (error) {
@@ -525,6 +652,8 @@ document.querySelector('#collapseAllButton').addEventListener('click', () => {
   fileTree.querySelectorAll('.tree-folder').forEach((folder) => folder.classList.add('collapsed'));
 });
 document.querySelector('#refreshButton').addEventListener('click', loadWorkspace);
+projectSelect.addEventListener('change', () => switchProject(projectSelect.value));
+newProjectButton.addEventListener('click', createNewProject);
 saveFileButton.addEventListener('click', saveActiveFile);
 
 codeEditor.addEventListener('input', () => {
@@ -581,6 +710,15 @@ document.querySelector('#mobileChatButton').addEventListener('click', () => assi
 document.querySelector('#closeMobileChatButton').addEventListener('click', () => assistantPanel.classList.remove('open'));
 undoLastButton.addEventListener('click', undoLastChange);
 newChatButton.addEventListener('click', startNewChat);
+diagnoseButton.addEventListener('click', runSmartDiagnosis);
+autoModeToggle.checked = state.autoMode;
+autoModeToggle.addEventListener('change', () => {
+  state.autoMode = autoModeToggle.checked;
+  localStorage.setItem(AUTO_MODE_STORAGE_KEY, String(state.autoMode));
+  showToast(state.autoMode
+    ? 'Modo supervisionado ligado: cada nova etapa pedirá sua aprovação.'
+    : 'Modo supervisionado desligado: será preparado apenas um plano por pedido.');
+});
 
 window.addEventListener('beforeunload', (event) => {
   if ([...state.openFiles.values()].some((file) => file.dirty)) {
@@ -590,4 +728,7 @@ window.addEventListener('beforeunload', (event) => {
 });
 
 restoreChatHistory();
-loadWorkspace();
+loadProjects().catch((error) => {
+  showToast(error.message, 'error');
+  loadWorkspace();
+});

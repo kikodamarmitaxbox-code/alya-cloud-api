@@ -424,9 +424,28 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === 'GET' && url.pathname === '/api/code-alya/projects') {
+      if (!requireAuth(req, res)) return;
+      await sendCodeAgentResponse(res, () => ({
+        ok: true,
+        projects: codeAgent.listProjects()
+      }));
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/code-alya/projects') {
+      if (!apiLimiter.check(req, res)) return;
+      if (!requireAuth(req, res)) return;
+      const body = await readJsonBody(req);
+      await sendCodeAgentResponse(res, () => codeAgent.createProject(body.name));
+      return;
+    }
+
     if (req.method === 'GET' && url.pathname === '/api/code-alya/workspace') {
       if (!requireAuth(req, res)) return;
-      await sendCodeAgentResponse(res, () => codeAgent.getWorkspaceStatus());
+      await sendCodeAgentResponse(res, () => codeAgent.getWorkspaceStatus(
+        url.searchParams.get('project')
+      ));
       return;
     }
 
@@ -434,7 +453,10 @@ const server = http.createServer(async (req, res) => {
       if (!requireAuth(req, res)) return;
       await sendCodeAgentResponse(res, () => ({
         ok: true,
-        actions: codeAgent.getActionHistory(url.searchParams.get('limit'))
+        actions: codeAgent.getActionHistory(
+          url.searchParams.get('limit'),
+          url.searchParams.get('project')
+        )
       }));
       return;
     }
@@ -443,7 +465,11 @@ const server = http.createServer(async (req, res) => {
       if (!requireAuth(req, res)) return;
       await sendCodeAgentResponse(res, () => ({
         ok: true,
-        ...codeAgent.readProjectFile(url.searchParams.get('path'))
+        ...codeAgent.readProjectFile(
+          url.searchParams.get('path'),
+          50000,
+          url.searchParams.get('project')
+        )
       }));
       return;
     }
@@ -455,8 +481,31 @@ const server = http.createServer(async (req, res) => {
       await sendCodeAgentResponse(res, () => codeAgent.createCodePlan(
         body.message,
         body.contextFiles,
+        body.history,
+        {
+          projectId: body.projectId,
+          autoMode: body.autoMode
+        }
+      ));
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/code-alya/diagnose') {
+      if (!expensiveLimiter.check(req, res)) return;
+      if (!requireAuth(req, res)) return;
+      const body = await readJsonBody(req);
+      await sendCodeAgentResponse(res, () => codeAgent.diagnoseProject(
+        body.projectId,
         body.history
       ));
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/code-alya/continue') {
+      if (!expensiveLimiter.check(req, res)) return;
+      if (!requireAuth(req, res)) return;
+      const body = await readJsonBody(req);
+      await sendCodeAgentResponse(res, () => codeAgent.continueCodeSession(body.sessionId));
       return;
     }
 
@@ -480,7 +529,10 @@ const server = http.createServer(async (req, res) => {
       if (!apiLimiter.check(req, res)) return;
       if (!requireAuth(req, res)) return;
       const body = await readJsonBody(req);
-      await sendCodeAgentResponse(res, () => codeAgent.runSafeCommand(body.command));
+      await sendCodeAgentResponse(res, () => codeAgent.runSafeCommand(
+        body.command,
+        body.projectId
+      ));
       return;
     }
 
@@ -488,7 +540,11 @@ const server = http.createServer(async (req, res) => {
       if (!apiLimiter.check(req, res)) return;
       if (!requireAuth(req, res)) return;
       const body = await readJsonBody(req);
-      await sendCodeAgentResponse(res, () => codeAgent.saveProjectFile(body.path, body.content));
+      await sendCodeAgentResponse(res, () => codeAgent.saveProjectFile(
+        body.path,
+        body.content,
+        body.projectId
+      ));
       return;
     }
 
