@@ -6,6 +6,7 @@ const {
   SALT_ROUNDS,
   MIN_PASSWORD_LENGTH,
   createUser,
+  createOrUpdateAdmin,
   normalizeUsername
 } = require('../lib/users');
 
@@ -66,7 +67,9 @@ async function main() {
   }
 
   await store.init();
-  const result = await createUser(username, password, { role });
+  const result = role === 'admin'
+    ? await createOrUpdateAdmin(username, password)
+    : await createUser(username, password, { role });
   if (!result.ok) throw new Error(result.error);
   await store.flush();
   process.stdout.write(`Conta ${role === 'admin' ? 'administradora' : 'de usuário'} criada: ${result.user.username}\n`);
