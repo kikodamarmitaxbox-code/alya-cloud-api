@@ -1,9 +1,8 @@
-const CACHE_NAME = 'alya-shell-v5';
+const CACHE_NAME = 'alya-shell-v6';
 const APP_SHELL = [
   '/aly',
   '/styles.css',
   '/aly.js',
-  '/code-alya',
   '/code-alya.css',
   '/code-alya.js',
   '/manifest.webmanifest',
@@ -27,6 +26,7 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
   if (request.method !== 'GET' || url.pathname.startsWith('/api/')) return;
+  if (request.mode === 'navigate' && url.pathname !== '/aly') return;
 
   event.respondWith(
     fetch(request)

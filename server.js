@@ -5,7 +5,15 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const logger = require('./lib/logger');
-const { isAuthenticated, hasSitePassword, validateLogin, setAuthCookie, clearAuthCookie, readSiteUsers, getAuthenticatedUsername } = require('./lib/auth');
+const {
+  isAuthenticated,
+  isAuthConfigured,
+  validateLogin,
+  setAuthCookie,
+  clearAuthCookie,
+  getAuthenticatedUser,
+  getAuthenticatedUsername
+} = require('./lib/auth');
 const { askAssistant, askAssistantStream, normalizeSettings, getProviderStatus, setPreferredProvider } = require('./lib/chat');
 const { handleWhatsappReceive, handleWhatsappApprove, handleWhatsappCancel, getWhatsappQueue, readWhatsappLog } = require('./lib/whatsapp');
 const { DiscordManager } = require('./lib/discord');
@@ -18,7 +26,7 @@ const memory = require('./lib/memory');
 const pluginManager = require('./lib/plugins');
 const { searchWeb, shouldSearchWeb } = require('./lib/webSearch');
 const { apiLimiter, authLimiter, expensiveLimiter } = require('./lib/rateLimit');
-const { createUser, deleteUser, listUsers, getUser } = require('./lib/users');
+const { createUser, deleteUser, listUsers, ensureBootstrapAdmin } = require('./lib/users');
 const notifications = require('./lib/notifications');
 const computerControl = require('./lib/computerControl');
 const persistentStore = require('./lib/persistentStore');
@@ -307,7 +315,7 @@ async function handleTunnelRestart(req, res) {
   logger.info('Reiniciando Cloudflare Tunnel manualmente...');
   stopCloudflareTunnel();
   tunnelStartAttempts = 0;
-  startCloudflareTunnel();
+  if (process.env.DISABLE_TUNNEL !== 'true') startCloudflareTunnel();
   // Aguarda até 15s para o novo link aparecer
   let attempts = 0;
   while (!publicTunnelUrl && attempts < 30) {
@@ -381,6 +389,17 @@ const server = http.createServer(async (req, res) => {
     }
 
     const url = new URL(req.url, `http://${req.headers.host || 'localhost:3000'}`);
+    const publicRoutes = new Set([
+      '/health',
+      '/api/auth/status',
+      '/api/auth/login',
+      '/api/auth/logout'
+    ]);
+
+    if (url.pathname.startsWith('/api/') && !publicRoutes.has(url.pathname)) {
+      if (!requireAuth(req, res)) return;
+      if (isAdminRoute(url.pathname) && !requireAdmin(req, res)) return;
+    }
 
     if (req.method === 'POST' && url.pathname === '/api/chat') {
       if (!apiLimiter.check(req, res)) return;
@@ -625,6 +644,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && url.pathname === '/game') {
+      if (!requireAuthPage(req, res)) return;
       serveGameStatic(res);
       return;
     }
@@ -645,12 +665,13 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && url.pathname === '/api/auth/status') {
-      const users = readSiteUsers();
-      const hasUsers = users.length > 0 || listUsers().length > 0;
+      const user = getAuthenticatedUser(req);
       sendJson(res, 200, {
-        protected: hasSitePassword(),
-        authenticated: isAuthenticated(req),
-        loginMode: hasUsers ? 'users' : hasSitePassword() ? 'password' : 'none'
+        protected: true,
+        authenticated: Boolean(user),
+        loginMode: 'users',
+        setupRequired: !isAuthConfigured(),
+        user
       });
       return;
     }
@@ -662,52 +683,12 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && url.pathname === '/api/auth/register') {
-      if (!authLimiter.check(req, res)) return;
-      if (process.env.ALLOW_SELF_REGISTRATION !== 'true' && !isAuthenticated(req)) {
-        sendJson(res, 403, { error: 'Criação pública de contas está desativada.' });
-        return;
-      }
-      const body = await readJsonBody(req);
-      const username = String(body.username || '').trim();
-      const password = String(body.password || '').trim();
-
-      if (!username || !password) {
-        sendJson(res, 400, { error: 'Digite seu usuário e senha.' });
-        return;
-      }
-
-      if (username.length < 3) {
-        sendJson(res, 400, { error: 'O usuário deve ter pelo menos 3 caracteres.' });
-        return;
-      }
-
-      if (password.length < 8) {
-        sendJson(res, 400, { error: 'A senha deve ter pelo menos 8 caracteres.' });
-        return;
-      }
-
-      const result = await createUser(username, password);
-      if (!result.ok) {
-        sendJson(res, 400, { error: result.error });
-        return;
-      }
-
-      setAuthCookie(res, result.user.username);
-      try {
-        notifications.createNotification({
-          title: 'Novo Usuário Cadastrado',
-          message: `Nova conta criada com sucesso para "${result.user.username}".`,
-          category: 'Segurança',
-          priority: 'Média'
-        });
-      } catch {}
-
-      sendJson(res, 200, { ok: true, username: result.user.username });
+      sendJson(res, 403, { error: 'Cadastro público desativado.' });
       return;
     }
 
     if (req.method === 'POST' && url.pathname === '/api/auth/logout') {
-      clearAuthCookie(res);
+      clearAuthCookie(req, res);
       sendJson(res, 200, { ok: true });
       return;
     }
@@ -1059,8 +1040,21 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (url.pathname === '/code-alya') {
+    if (url.pathname === '/code-alya' || url.pathname === '/code-alya.html') {
+      if (!requireAuthPage(req, res) || !requireAdminPage(req, res)) return;
       serveStatic('/code-alya.html', res);
+      return;
+    }
+
+    if (url.pathname === '/' || url.pathname === '/index.html') {
+      res.writeHead(302, { Location: '/aly', 'Cache-Control': 'no-store' });
+      res.end();
+      return;
+    }
+
+    if (url.pathname === '/game.html') {
+      if (!requireAuthPage(req, res)) return;
+      serveGameStatic(res);
       return;
     }
 
@@ -1080,6 +1074,10 @@ const server = http.createServer(async (req, res) => {
 
 async function startApplication() {
   await persistentStore.init();
+  await ensureBootstrapAdmin();
+  if (!String(process.env.SESSION_SECRET || '').trim()) {
+    logger.warn('Login bloqueado: configure SESSION_SECRET para liberar a Alya.');
+  }
   await discordManager.init().catch((error) => logger.error('Discord init error:', error));
   server.listen(port, '0.0.0.0', async () => {
   logger.info(`Assistente pronto em http://localhost:${port}`);
@@ -1090,7 +1088,7 @@ async function startApplication() {
     priority: 'Média'
   });
   rotateBackups();
-  startCloudflareTunnel();
+  if (process.env.DISABLE_TUNNEL !== 'true') startCloudflareTunnel();
   await pluginManager.init().catch((err) => logger.error('PluginManager init error:', err));
 
   // Otimização automática de memória RAM (Limpeza a cada 15 min)
@@ -1162,8 +1160,48 @@ function serveStatic(requestPath, res) {
 
 function requireAuth(req, res) {
   if (isAuthenticated(req)) return true;
-  sendJson(res, 401, { error: 'Digite a senha para entrar na Alya.' });
+  sendJson(res, 401, { error: 'Autenticação necessária.' });
   return false;
+}
+
+function requireAdmin(req, res) {
+  const user = getAuthenticatedUser(req);
+  if (user?.role === 'admin') return true;
+  sendJson(res, 403, { error: 'Acesso permitido somente ao administrador.' });
+  return false;
+}
+
+function requireAuthPage(req, res) {
+  if (isAuthenticated(req)) return true;
+  res.writeHead(302, { Location: '/aly', 'Cache-Control': 'no-store' });
+  res.end();
+  return false;
+}
+
+function requireAdminPage(req, res) {
+  if (getAuthenticatedUser(req)?.role === 'admin') return true;
+  res.writeHead(302, { Location: '/aly', 'Cache-Control': 'no-store' });
+  res.end();
+  return false;
+}
+
+function isAdminRoute(pathname) {
+  return [
+    '/api/users/',
+    '/api/code-alya/',
+    '/api/dev/',
+    '/api/system-dashboard',
+    '/api/system/model',
+    '/api/computer/',
+    '/api/tunnel-restart',
+    '/api/aly-link',
+    '/api/aly-status',
+    '/api/notifications',
+    '/api/plugins',
+    '/api/whatsapp/',
+    '/api/discord/',
+    '/api/ai-status'
+  ].some((prefix) => pathname === prefix || pathname.startsWith(prefix));
 }
 
 async function sendCodeAgentResponse(res, operation) {
@@ -1210,13 +1248,6 @@ async function sendCodeAgentStream(res, operation) {
 
 async function handleLogin(req, res) {
   const body = await readJsonBody(req);
-  const users = readSiteUsers();
-
-  if (users.length === 0 && !hasSitePassword()) {
-    sendJson(res, 200, { ok: true, protected: false, loginMode: 'none' });
-    return;
-  }
-
   const result = await validateLogin(body.username, body.password);
 
   if (!result.success) {
@@ -1226,11 +1257,11 @@ async function handleLogin(req, res) {
   }
 
   metrics.increment('loginSuccesses');
-  setAuthCookie(res, result.user);
+  setAuthCookie(req, res, result.user);
   sendJson(res, 200, {
     ok: true,
     protected: true,
-    loginMode: users.length > 0 || listUsers().length > 0 ? 'users' : 'password',
+    loginMode: 'users',
     user: result.user
   });
 }
@@ -1474,29 +1505,11 @@ function serveGameStatic(res) {
 }
 
 async function handleHealthCheck(req, res) {
-  const providerStatus = getProviderStatus();
-  const configuredProviders = providerStatus.providers
-    .filter((provider) => provider.configured)
-    .map((provider) => provider.name);
-  const health = {
+  sendJson(res, 200, {
     ok: true,
     name: 'Alya',
-    version: '2.1.0',
-    timestamp: new Date().toISOString(),
-    dependencies: {
-      ai: configuredProviders.length > 0,
-      preferredProvider: providerStatus.preferred,
-      configuredProviders,
-      openrouter: !!process.env.OPENROUTER_API_KEY,
-      gemini: !!process.env.GEMINI_API_KEY
-    },
-    discord: {
-      enabled: discordManager.enabled,
-      ready: discordManager.isReady()
-    }
-  };
-
-  sendJson(res, 200, health);
+    online: true
+  });
 }
 
 async function handleWhatsappReceiveRoute(req, res) {
@@ -1765,14 +1778,16 @@ async function handleMemoryDeleteKnowledge(req, res) {
 
 async function handleCreateUser(req, res) {
   const body = await readJsonBody(req);
-  const { username, password } = body;
+  const { username, password, role } = body;
 
   if (!username || !password) {
     sendJson(res, 400, { error: 'Nome de usuario e senha sao obrigatorios.' });
     return;
   }
 
-  const result = await createUser(username, password);
+  const result = await createUser(username, password, {
+    role: role === 'admin' ? 'admin' : 'user'
+  });
 
   if (result.ok) {
     sendJson(res, 200, result);

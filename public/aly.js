@@ -88,6 +88,10 @@ const authUsername = document.querySelector('#authUsername');
 const authPassword = document.querySelector('#authPassword');
 const authSubmitButton = document.querySelector('#authSubmitButton');
 const authStatus = document.querySelector('#authStatus');
+const logoutButton = document.querySelector('#logoutButton');
+const profileName = document.querySelector('.profile-name');
+const profileRole = document.querySelector('.profile-role');
+const welcomeUserName = document.querySelector('.welcome-title span');
 
 const storageKey = 'nova-chat-history';
 const settingsKey = 'nova-settings';
@@ -96,6 +100,8 @@ const appSettingsKey = 'nova-app-settings';
 const usernameKey = 'nova-username';
 const conversationsKey = 'nova-conversations';
 
+let currentSessionUsername = '';
+let currentSessionRole = '';
 let history = [];
 let settings = loadSettings();
 let conversations = loadConversations();
@@ -111,7 +117,7 @@ let voiceRecognition = null;
 let pendingAttachment = null;
 let previousProviderSignature = '';
 let deferredInstallPrompt = null;
-let authMode = 'none';
+let authMode = 'users';
 
 const providerLabels = {
   openrouter: 'OpenRouter',
@@ -137,8 +143,33 @@ function showAuthModal(message = '') {
   if (!authModal) return;
   authModal.hidden = false;
   authStatus.textContent = message;
-  authUsernameLabel.hidden = authMode !== 'users';
-  setTimeout(() => (authMode === 'users' ? authUsername : authPassword)?.focus(), 50);
+  authUsernameLabel.hidden = false;
+  setTimeout(() => authUsername?.focus(), 50);
+}
+
+function scopedStorageKey(key) {
+  return `${key}:${currentSessionUsername || 'sem-sessao'}`;
+}
+
+function activateSession(user) {
+  currentSessionUsername = String(user?.username || '').toLowerCase();
+  currentSessionRole = user?.role === 'admin' ? 'admin' : 'user';
+  settings = loadSettings();
+  conversations = loadConversations();
+  currentConversationId = conversations[0]?.id || null;
+  if (!currentConversationId) currentConversationId = createNewConversation();
+  history = loadConversationHistory(currentConversationId);
+  if (personalitySelect) personalitySelect.value = settings.personality;
+  if (modeSelect) modeSelect.value = settings.mode;
+  if (memoryInput) memoryInput.value = settings.memory;
+  if (profileName) profileName.textContent = currentSessionUsername;
+  if (profileRole) profileRole.textContent = currentSessionRole === 'admin' ? 'Administrador' : 'Conta Privada';
+  if (welcomeUserName) welcomeUserName.textContent = `${getUserName()}.`;
+  if (settingsUserName) settingsUserName.value = getUserName();
+  const isAdmin = currentSessionRole === 'admin';
+  [systemButton, codeAlyaButton, computerButton, publicLinkBanner].forEach((element) => {
+    if (element) element.hidden = !isAdmin;
+  });
 }
 
 async function checkAuthentication() {
@@ -148,11 +179,12 @@ async function checkAuthentication() {
       credentials: 'include'
     });
     const data = await response.json();
-    authMode = data.loginMode || 'none';
-    if (data.protected && !data.authenticated) {
-      showAuthModal();
+    authMode = 'users';
+    if (!data.authenticated) {
+      showAuthModal(data.setupRequired ? 'O administrador ainda precisa configurar a primeira conta.' : '');
       return false;
     }
+    activateSession(data.user);
     if (authModal) authModal.hidden = true;
     return true;
   } catch {
@@ -171,20 +203,33 @@ async function submitAuthentication(event) {
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        username: authMode === 'users' ? authUsername.value.trim() : 'visitante',
+        username: authUsername.value.trim(),
         password: authPassword.value
       })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.ok) throw new Error(data.error || 'Não foi possível entrar.');
+    activateSession(data.user);
     authModal.hidden = true;
     authPassword.value = '';
     showToast('Acesso liberado. Bem-vindo à Alya.', 'success');
     refreshProviderStatus(false);
   } catch (error) {
-    authStatus.textContent = error.message || 'Usuário ou senha incorretos.';
+    authStatus.textContent = error.message || 'Usuário ou senha inválidos';
   } finally {
     authSubmitButton.disabled = false;
+  }
+}
+
+async function logout() {
+  logoutButton.disabled = true;
+  try {
+    await fetch(`${apiBase}/api/auth/logout`, {
+      method: 'POST',
+      credentials: 'include'
+    });
+  } finally {
+    window.location.reload();
   }
 }
 
@@ -266,7 +311,7 @@ async function saveSystemModel() {
       throw new Error('Sua sessão terminou.');
     }
     if (!response.ok || !data.ok) throw new Error(data.error || 'Não consegui mudar o modelo.');
-    localStorage.setItem(preferredProviderKey, provider);
+    localStorage.setItem(scopedStorageKey(preferredProviderKey), provider);
     systemModelStatus.textContent = `${providerLabels[provider] || provider} selecionado. Reabrindo a Alya...`;
     setTimeout(() => window.location.reload(), 650);
   } catch (error) {
@@ -276,7 +321,7 @@ async function saveSystemModel() {
 }
 
 async function syncSavedProviderPreference() {
-  const provider = localStorage.getItem(preferredProviderKey);
+  const provider = localStorage.getItem(scopedStorageKey(preferredProviderKey));
   if (!provider) return;
   try {
     const statusResponse = await fetch(`${apiBase}/api/ai-status`, { cache: 'no-store' });
@@ -673,7 +718,7 @@ function setBusy(isBusy) {
 
 function loadSettings() {
   try {
-    const saved = JSON.parse(localStorage.getItem(settingsKey) || '{}');
+    const saved = JSON.parse(localStorage.getItem(scopedStorageKey(settingsKey)) || '{}');
     return {
       personality: ['equilibrada', 'direta', 'amiga', 'tecnica', 'jarvis'].includes(saved.personality)
         ? saved.personality
@@ -689,12 +734,12 @@ function loadSettings() {
 }
 
 function saveSettings() {
-  localStorage.setItem(settingsKey, JSON.stringify(settings));
+  localStorage.setItem(scopedStorageKey(settingsKey), JSON.stringify(settings));
 }
 
 function loadAppSettings() {
   try {
-    return JSON.parse(localStorage.getItem(appSettingsKey) || '{}');
+    return JSON.parse(localStorage.getItem(scopedStorageKey(appSettingsKey)) || '{}');
   } catch {
     return {};
   }
@@ -703,7 +748,7 @@ function loadAppSettings() {
 function saveAppSettings(updates) {
   const current = loadAppSettings();
   Object.assign(current, updates);
-  localStorage.setItem(appSettingsKey, JSON.stringify(current));
+  localStorage.setItem(scopedStorageKey(appSettingsKey), JSON.stringify(current));
 }
 
 function getWelcomeEnabled() {
@@ -717,7 +762,7 @@ function setWelcomeEnabled(enabled) {
 
 function getUserName() {
   try {
-    return localStorage.getItem(usernameKey) || 'Pedro';
+    return localStorage.getItem(scopedStorageKey(usernameKey)) || currentSessionUsername || 'Pedro';
   } catch {
     return 'Pedro';
   }
@@ -748,7 +793,7 @@ function decompress(text) {
 
 function loadHistory() {
   try {
-    const saved = localStorage.getItem(storageKey);
+    const saved = localStorage.getItem(scopedStorageKey(storageKey));
     if (!saved) return [];
     const decompressed = decompress(saved);
     return Array.isArray(JSON.parse(decompressed)) ? JSON.parse(decompressed) : [];
@@ -760,7 +805,7 @@ function loadHistory() {
 function saveHistory() {
   try {
     const toSave = JSON.stringify(history.slice(-50));
-    localStorage.setItem(storageKey, compress(toSave));
+    localStorage.setItem(scopedStorageKey(storageKey), compress(toSave));
   } catch (error) {
     console.error('Error saving history:', error);
   }
@@ -768,7 +813,7 @@ function saveHistory() {
 
 function loadConversations() {
   try {
-    const saved = localStorage.getItem(conversationsKey);
+    const saved = localStorage.getItem(scopedStorageKey(conversationsKey));
     if (!saved) return [];
     const decompressed = decompress(saved);
     return Array.isArray(JSON.parse(decompressed)) ? JSON.parse(decompressed) : [];
@@ -780,7 +825,7 @@ function loadConversations() {
 function saveConversations() {
   try {
     const toSave = JSON.stringify(conversations);
-    localStorage.setItem(conversationsKey, compress(toSave));
+    localStorage.setItem(scopedStorageKey(conversationsKey), compress(toSave));
   } catch (error) {
     console.error('Error saving conversations:', error);
   }
@@ -829,7 +874,7 @@ function switchConversation(conversationId) {
 
 function loadConversationHistory(conversationId) {
   try {
-    const saved = localStorage.getItem(`${storageKey}-${conversationId}`);
+    const saved = localStorage.getItem(scopedStorageKey(`${storageKey}-${conversationId}`));
     if (!saved) return [];
     const decompressed = decompress(saved);
     return Array.isArray(JSON.parse(decompressed)) ? JSON.parse(decompressed) : [];
@@ -841,7 +886,7 @@ function loadConversationHistory(conversationId) {
 function saveConversationHistory(conversationId, messages) {
   try {
     const toSave = JSON.stringify(messages.slice(-50));
-    localStorage.setItem(`${storageKey}-${conversationId}`, compress(toSave));
+    localStorage.setItem(scopedStorageKey(`${storageKey}-${conversationId}`), compress(toSave));
   } catch (error) {
     console.error('Error saving conversation history:', error);
   }
@@ -850,7 +895,7 @@ function saveConversationHistory(conversationId, messages) {
 function deleteConversation(conversationId) {
   conversations = conversations.filter(c => c.id !== conversationId);
   saveConversations();
-  localStorage.removeItem(`${storageKey}-${conversationId}`);
+  localStorage.removeItem(scopedStorageKey(`${storageKey}-${conversationId}`));
 
   if (conversations.length === 0) {
     currentConversationId = createNewConversation();
@@ -1016,6 +1061,7 @@ async function sendMessage(content) {
 
   const body = {
     messages: messagesForRequest,
+    conversationId: currentConversationId,
     settings: {
       personality: personalitySelect.value,
       mode: modeSelect.value,
@@ -1228,6 +1274,7 @@ document.querySelectorAll('[data-tool-prompt]').forEach((button) => {
 });
 
 authForm?.addEventListener('submit', submitAuthentication);
+logoutButton?.addEventListener('click', logout);
 systemButton?.addEventListener('click', openSystemDashboard);
 codeAlyaButton?.addEventListener('click', () => {
   window.location.href = '/code-alya';
@@ -1338,7 +1385,8 @@ function applySettings() {
   };
 
   saveAppSettings(updates);
-  if (updates.userName) localStorage.setItem(usernameKey, updates.userName);
+  if (updates.userName) localStorage.setItem(scopedStorageKey(usernameKey), updates.userName);
+  if (welcomeUserName && updates.userName) welcomeUserName.textContent = `${updates.userName}.`;
   closeSettings();
 }
 
@@ -1383,7 +1431,7 @@ function init() {
   if (saved.personality && personalitySelect) personalitySelect.value = saved.personality;
   if (saved.mode && modeSelect) modeSelect.value = saved.mode;
 
-  const previousAuth = localStorage.getItem('aly-audio-authorized') === 'true';
+  const previousAuth = localStorage.getItem(scopedStorageKey('aly-audio-authorized')) === 'true';
   if (previousAuth) {
     audioAuthorized = true;
   }
@@ -1432,7 +1480,7 @@ function init() {
   }, 400);
 
   setTimeout(() => {
-    showLoadingScreen('Bem-vindo, Pedro', 80);
+    showLoadingScreen('Bem-vindo à Alya', 80);
   }, 900);
 
   setTimeout(async () => {
@@ -1572,7 +1620,7 @@ function iniciarAudio() {
       audioContext.resume();
     }
     audioAuthorized = true;
-    localStorage.setItem('aly-audio-authorized', 'true');
+    localStorage.setItem(scopedStorageKey('aly-audio-authorized'), 'true');
 
     const soundPrompt = document.querySelector('#soundPrompt');
     if (soundPrompt) soundPrompt.hidden = true;
