@@ -106,6 +106,48 @@ async function api(url, options = {}) {
   return data;
 }
 
+async function streamApi(url, options = {}, onProgress = () => {}) {
+  const response = await fetch(url, {
+    credentials: 'same-origin',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      ...(options.headers || {})
+    }
+  });
+  if (response.status === 401) throw new Error('Entre na Alya primeiro para abrir a Code Alya.');
+  if (!response.ok || !response.body) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || 'Não foi possível concluir.');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let result = null;
+  const processFrame = (frame) => {
+    const dataLine = frame.split(/\r?\n/).find((line) => line.startsWith('data:'));
+    if (!dataLine) return;
+    const event = JSON.parse(dataLine.slice(5).trim());
+    if (event.type === 'progress') onProgress(event.message);
+    else if (event.type === 'result') result = event.data;
+    else if (event.type === 'error') throw new Error(event.error || 'A Code Alya encontrou um problema.');
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+    const frames = buffer.split(/\r?\n\r?\n/);
+    buffer = frames.pop() || '';
+    for (const frame of frames) processFrame(frame);
+    if (done) break;
+  }
+  if (buffer.trim()) processFrame(buffer);
+  if (!result) throw new Error('A Code Alya não recebeu o resultado completo.');
+  return result;
+}
+
 function showToast(message, type = '') {
   toast.textContent = message;
   toast.className = `toast show ${type}`.trim();
@@ -377,10 +419,16 @@ function addMessage(role, content, extraHtml = '') {
 function addThinking() {
   const article = document.createElement('article');
   article.className = 'message assistant-message thinking-message';
-  article.innerHTML = '<div class="message-label">ALYA</div><div class="message-content"><span class="thinking-dots"><i></i><i></i><i></i></span><span>Analisando o projeto e preparando o código...</span></div>';
+  article.innerHTML = '<div class="message-label">ALYA</div><div class="message-content"><span class="thinking-dots"><i></i><i></i><i></i></span><span class="thinking-status">Analisando o projeto e preparando o código...</span></div>';
   chatMessages.appendChild(article);
   chatMessages.scrollTop = chatMessages.scrollHeight;
   return article;
+}
+
+function updateThinking(article, message) {
+  const status = article?.querySelector('.thinking-status');
+  if (status && message) status.textContent = message;
+  chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 function restoreChatHistory() {
@@ -450,8 +498,11 @@ async function sendCodeRequest(message) {
   rememberMessage('user', clean);
   addMessage('user', clean);
   const thinking = addThinking();
+  const wakeTimer = setTimeout(() => {
+    updateThinking(thinking, 'O servidor gratuito está acordando. Seu pedido continua salvo...');
+  }, 4500);
   try {
-    const data = await api('/api/code-alya/plan', {
+    const data = await streamApi('/api/code-alya/plan-stream', {
       method: 'POST',
       body: JSON.stringify({
         message: clean,
@@ -460,10 +511,15 @@ async function sendCodeRequest(message) {
         projectId: state.projectId,
         autoMode: state.autoMode
       })
+    }, (message) => {
+      clearTimeout(wakeTimer);
+      updateThinking(thinking, message);
     });
+    clearTimeout(wakeTimer);
     thinking.remove();
     renderPlan(data);
   } catch (error) {
+    clearTimeout(wakeTimer);
     thinking.remove();
     addMessage('assistant', error.message);
     rememberMessage('assistant', error.message);
@@ -732,3 +788,9 @@ loadProjects().catch((error) => {
   showToast(error.message, 'error');
   loadWorkspace();
 });
+
+if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}

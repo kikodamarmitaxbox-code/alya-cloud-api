@@ -15,6 +15,16 @@ services:
         value: openrouter/free
       - key: MAX_TOKENS
         value: "500"
+      - key: ALYA_CODE_PROVIDER
+        value: openrouter
+      - key: ALYA_CODE_MAX_TOKENS
+        value: "6000"
+      - key: ALYA_CODE_TIMEOUT_MS
+        value: "18000"
+      - key: ALYA_CODE_HEDGE_DELAY_MS
+        value: "2200"
+      - key: ALYA_CODE_HEDGE_MAX
+        value: "2"
       - key: OPENROUTER_API_KEY
         sync: false
       - key: FRIEND_USERS

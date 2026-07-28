@@ -73,6 +73,11 @@ npm start
 | `AI_PROVIDER` | Provedor de IA (`openrouter` ou `gemini`) | Não |
 | `OPENROUTER_API_KEY` | Chave da API OpenRouter | Sim (se usar openrouter) |
 | `GEMINI_API_KEY` | Chave da API Gemini | Sim (se usar gemini) |
+| `ALYA_CODE_PROVIDER` | Provedor principal da Code Alya | Não |
+| `ALYA_CODE_MAX_TOKENS` | Limite de saída dos planos de código | Não (padrão: 6000) |
+| `ALYA_CODE_TIMEOUT_MS` | Tempo máximo de uma tentativa de modelo | Não (padrão: 18000) |
+| `ALYA_CODE_HEDGE_DELAY_MS` | Espera antes de chamar o modelo reserva | Não (padrão: 2200) |
+| `ALYA_CODE_HEDGE_MAX` | Quantidade máxima de modelos por tentativa | Não (padrão: 2) |
 | `FRIEND_USERS` | Lista de usuários autorizados (formato `user:hash`) | Não |
 | `SITE_PASSWORD` | Senha única de acesso | Não |
 | `PORT` | Porta do servidor | Não (padrão: 3000) |

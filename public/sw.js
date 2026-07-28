@@ -1,8 +1,11 @@
-const CACHE_NAME = 'alya-shell-v4';
+const CACHE_NAME = 'alya-shell-v5';
 const APP_SHELL = [
   '/aly',
   '/styles.css',
   '/aly.js',
+  '/code-alya',
+  '/code-alya.css',
+  '/code-alya.js',
   '/manifest.webmanifest',
   '/images/alya-avatar.png'
 ];
@@ -32,6 +35,9 @@ self.addEventListener('fetch', (event) => {
         caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
         return response;
       })
-      .catch(() => caches.match(request).then((cached) => cached || caches.match('/aly')))
+      .catch(() => caches.match(request).then((cached) => (
+        cached ||
+        (url.pathname.startsWith('/code-alya') ? caches.match('/code-alya') : caches.match('/aly'))
+      )))
   );
 });

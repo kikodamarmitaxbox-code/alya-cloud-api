@@ -10,10 +10,12 @@ const requiredFiles = [
   'lib/auth.js',
   'lib/chat.js',
   'lib/codeAgent.js',
+  'lib/persistentStore.js',
   'lib/fileOps.js',
   'lib/plugins.js',
   'public/aly.js',
-  'public/code-alya.js'
+  'public/code-alya.js',
+  'public/sw.js'
 ];
 
 function verifySyntax() {
@@ -27,12 +29,19 @@ function verifySyntax() {
 function verifyCodeAlyaInterface() {
   const html = fs.readFileSync(path.join(root, 'public', 'code-alya.html'), 'utf8');
   const client = fs.readFileSync(path.join(root, 'public', 'code-alya.js'), 'utf8');
+  const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
   const referencedIds = [...client.matchAll(/querySelector\(['"]#([^'"]+)['"]\)/g)]
     .map((match) => match[1]);
   for (const id of new Set(referencedIds)) {
     if (!new RegExp(`id=["']${id}["']`).test(html)) {
       throw new Error(`Elemento da Code Alya ausente na interface: #${id}`);
     }
+  }
+  if (
+    !client.includes("streamApi('/api/code-alya/plan-stream'") ||
+    !server.includes("url.pathname === '/api/code-alya/plan-stream'")
+  ) {
+    throw new Error('O progresso em tempo real da Code Alya não está conectado.');
   }
 }
 
@@ -64,6 +73,7 @@ async function verifySafety() {
   }
   if (
     typeof codeAgent.parseModelPlan !== 'function' ||
+    typeof codeAgent.normalizeModelActions !== 'function' ||
     typeof codeAgent.getActionHistory !== 'function' ||
     typeof codeAgent.undoCodeAction !== 'function' ||
     typeof codeAgent.listProjects !== 'function' ||
@@ -95,6 +105,19 @@ async function verifySafety() {
     const projectReadme = codeAgent.readProjectFile('README.md', 50000, createdProject.id);
     if (!projectReadme.content.includes(testProjectName)) {
       throw new Error('O projeto separado não conseguiu ler o próprio arquivo.');
+    }
+    const patchActions = codeAgent.normalizeModelActions([{
+      type: 'patch',
+      path: 'README.md',
+      find: 'Projeto criado pela Code Alya.',
+      replace: 'Projeto verificado pela Code Alya.'
+    }], createdProject.id);
+    if (
+      patchActions.length !== 1 ||
+      patchActions[0].type !== 'write' ||
+      !patchActions[0].content.includes('Projeto verificado pela Code Alya.')
+    ) {
+      throw new Error('A edição econômica por trechos não foi preparada corretamente.');
     }
     let crossProjectBlocked = false;
     try {

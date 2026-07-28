@@ -490,6 +490,23 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === 'POST' && url.pathname === '/api/code-alya/plan-stream') {
+      if (!expensiveLimiter.check(req, res)) return;
+      if (!requireAuth(req, res)) return;
+      const body = await readJsonBody(req);
+      await sendCodeAgentStream(res, (onProgress) => codeAgent.createCodePlan(
+        body.message,
+        body.contextFiles,
+        body.history,
+        {
+          projectId: body.projectId,
+          autoMode: body.autoMode,
+          onProgress
+        }
+      ));
+      return;
+    }
+
     if (req.method === 'POST' && url.pathname === '/api/code-alya/diagnose') {
       if (!expensiveLimiter.check(req, res)) return;
       if (!requireAuth(req, res)) return;
@@ -1159,6 +1176,35 @@ async function sendCodeAgentResponse(res, operation) {
       : 'A Code Alya não conseguiu concluir essa ação.';
     logger.warn(`Code Alya: ${message}`);
     sendJson(res, 400, { ok: false, error: message });
+  }
+}
+
+async function sendCodeAgentStream(res, operation) {
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
+  let ended = false;
+  const sendEvent = (payload) => {
+    if (ended || res.writableEnded) return;
+    res.write(`data: ${JSON.stringify(payload)}\n\n`);
+  };
+  try {
+    const result = await operation((message) => {
+      sendEvent({ type: 'progress', message: String(message || '').slice(0, 180) });
+    });
+    sendEvent({ type: 'result', data: result });
+  } catch (error) {
+    const message = error instanceof Error && error.message
+      ? error.message
+      : 'A Code Alya não conseguiu concluir essa ação.';
+    logger.warn(`Code Alya: ${message}`);
+    sendEvent({ type: 'error', error: message });
+  } finally {
+    ended = true;
+    res.end();
   }
 }
 
