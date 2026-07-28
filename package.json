@@ -13,6 +13,7 @@
     "test:auth": "node scripts/auth-test.js",
     "criar-usuario": "node scripts/create-user.js",
     "criar-admin": "node scripts/create-user.js --admin",
+    "criar-convite": "node scripts/create-invite.js",
     "trocar-senha": "node scripts/manage-user.js password",
     "bloquear-usuario": "node scripts/manage-user.js block",
     "desbloquear-usuario": "node scripts/manage-user.js unblock",

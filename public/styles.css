@@ -434,6 +434,10 @@ html, body {
 }
 .auth-card input:focus { border-color: var(--border-accent); box-shadow: 0 0 0 2px rgba(140,105,224,.14); }
 .auth-card .tool-button { justify-content: center; min-height: 42px; margin-top: 3px; }
+.auth-card .auth-switch-button {
+  color: var(--text-secondary); background: transparent; border: 1px solid var(--border-hover);
+}
+.auth-card .auth-switch-button:hover { color: var(--text-primary); background: var(--bg-primary); }
 .auth-status { min-height: 18px; color: #ffadad !important; }
 
 .toast-container {

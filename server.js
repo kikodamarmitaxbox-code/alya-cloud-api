@@ -41,6 +41,7 @@ const {
   ensureBootstrapAdmin
 } = require('./lib/users');
 const userFiles = require('./lib/userFiles');
+const { redeemInvitation } = require('./lib/invitations');
 const notifications = require('./lib/notifications');
 const computerControl = require('./lib/computerControl');
 const persistentStore = require('./lib/persistentStore');
@@ -410,6 +411,7 @@ const server = http.createServer(async (req, res) => {
       '/health',
       '/api/auth/status',
       '/api/auth/login',
+      '/api/auth/register',
       '/api/auth/logout'
     ]);
 
@@ -729,7 +731,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && url.pathname === '/api/auth/register') {
-      sendJson(res, 403, { error: 'Cadastro público desativado.' });
+      if (!authLimiter.check(req, res)) return;
+      await handleRegistration(req, res);
       return;
     }
 
@@ -1315,6 +1318,26 @@ async function handleLogin(req, res) {
   metrics.increment('loginSuccesses');
   setAuthCookie(req, res, result.user);
   sendJson(res, 200, {
+    ok: true,
+    protected: true,
+    loginMode: 'users',
+    user: result.user
+  });
+}
+
+async function handleRegistration(req, res) {
+  const body = await readJsonBody(req);
+  const result = await redeemInvitation(body.inviteCode, body.username, body.password);
+
+  if (!result.ok) {
+    metrics.increment('registrationFailures');
+    sendJson(res, 400, { error: result.error || 'Não foi possível criar a conta.' });
+    return;
+  }
+
+  metrics.increment('registrations');
+  setAuthCookie(req, res, result.user);
+  sendJson(res, 201, {
     ok: true,
     protected: true,
     loginMode: 'users',

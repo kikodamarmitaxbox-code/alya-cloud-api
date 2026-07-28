@@ -86,7 +86,14 @@ const authForm = document.querySelector('#authForm');
 const authUsernameLabel = document.querySelector('#authUsernameLabel');
 const authUsername = document.querySelector('#authUsername');
 const authPassword = document.querySelector('#authPassword');
+const authPasswordConfirmation = document.querySelector('#authPasswordConfirmation');
+const authPasswordConfirmationLabel = document.querySelector('#authPasswordConfirmationLabel');
+const authInviteCode = document.querySelector('#authInviteCode');
+const authInviteCodeLabel = document.querySelector('#authInviteCodeLabel');
+const authTitle = document.querySelector('#authTitle');
+const authDescription = document.querySelector('#authDescription');
 const authSubmitButton = document.querySelector('#authSubmitButton');
+const authSwitchButton = document.querySelector('#authSwitchButton');
 const authStatus = document.querySelector('#authStatus');
 const logoutButton = document.querySelector('#logoutButton');
 const profileName = document.querySelector('.profile-name');
@@ -118,6 +125,7 @@ let pendingAttachment = null;
 let previousProviderSignature = '';
 let deferredInstallPrompt = null;
 let authMode = 'users';
+let authScreenMode = 'login';
 
 const providerLabels = {
   openrouter: 'OpenRouter',
@@ -144,6 +152,27 @@ function showAuthModal(message = '') {
   authModal.hidden = false;
   authStatus.textContent = message;
   authUsernameLabel.hidden = false;
+  setTimeout(() => authUsername?.focus(), 50);
+}
+
+function setAuthScreenMode(mode) {
+  authScreenMode = mode === 'register' ? 'register' : 'login';
+  const registering = authScreenMode === 'register';
+  authTitle.textContent = registering ? 'Criar minha conta' : 'Entrar na Alya';
+  authDescription.textContent = registering
+    ? 'Use o código de convite enviado pelo administrador.'
+    : 'Este espaço é privado. Entre para continuar.';
+  authSubmitButton.textContent = registering ? 'Criar conta' : 'Entrar';
+  authSwitchButton.textContent = registering ? 'Voltar para entrar' : 'Cadastrar';
+  authPassword.autocomplete = registering ? 'new-password' : 'current-password';
+  authPasswordConfirmationLabel.hidden = !registering;
+  authInviteCodeLabel.hidden = !registering;
+  authPasswordConfirmation.required = registering;
+  authInviteCode.required = registering;
+  authStatus.textContent = '';
+  authPassword.value = '';
+  authPasswordConfirmation.value = '';
+  authInviteCode.value = '';
   setTimeout(() => authUsername?.focus(), 50);
 }
 
@@ -195,16 +224,22 @@ async function checkAuthentication() {
 
 async function submitAuthentication(event) {
   event.preventDefault();
+  const registering = authScreenMode === 'register';
+  if (registering && authPassword.value !== authPasswordConfirmation.value) {
+    authStatus.textContent = 'As senhas não são iguais.';
+    return;
+  }
   authSubmitButton.disabled = true;
-  authStatus.textContent = 'Verificando...';
+  authStatus.textContent = registering ? 'Criando sua conta...' : 'Verificando...';
   try {
-    const response = await fetch(`${apiBase}/api/auth/login`, {
+    const response = await fetch(`${apiBase}/api/auth/${registering ? 'register' : 'login'}`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         username: authUsername.value.trim(),
-        password: authPassword.value
+        password: authPassword.value,
+        ...(registering ? { inviteCode: authInviteCode.value.trim() } : {})
       })
     });
     const data = await response.json().catch(() => ({}));
@@ -212,7 +247,9 @@ async function submitAuthentication(event) {
     activateSession(data.user);
     authModal.hidden = true;
     authPassword.value = '';
-    showToast('Acesso liberado. Bem-vindo à Alya.', 'success');
+    authPasswordConfirmation.value = '';
+    authInviteCode.value = '';
+    showToast(registering ? 'Conta criada. Bem-vindo à Alya.' : 'Acesso liberado. Bem-vindo à Alya.', 'success');
     refreshProviderStatus(false);
   } catch (error) {
     authStatus.textContent = error.message || 'Usuário ou senha inválidos';
@@ -1274,6 +1311,9 @@ document.querySelectorAll('[data-tool-prompt]').forEach((button) => {
 });
 
 authForm?.addEventListener('submit', submitAuthentication);
+authSwitchButton?.addEventListener('click', () => {
+  setAuthScreenMode(authScreenMode === 'login' ? 'register' : 'login');
+});
 logoutButton?.addEventListener('click', logout);
 systemButton?.addEventListener('click', openSystemDashboard);
 codeAlyaButton?.addEventListener('click', () => {
