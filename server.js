@@ -1481,7 +1481,7 @@ async function handleHealthCheck(req, res) {
   const health = {
     ok: true,
     name: 'Alya',
-    version: '2.0.0',
+    version: '2.1.0',
     timestamp: new Date().toISOString(),
     dependencies: {
       ai: configuredProviders.length > 0,
