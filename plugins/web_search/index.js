@@ -23,7 +23,7 @@ class WebSearchPlugin {
 
       const settings = this.api.getSettings();
       if (settings.autoSearch && shouldSearchWeb(userMessage)) {
-        this.api.logger.info(`Pesquisa automática acionada para: "${userMessage}"`);
+        this.api.logger.info('Pesquisa automática acionada para uma pergunta atual.');
         const searchResult = await searchWeb(userMessage);
 
         if (searchResult && searchResult.text) {

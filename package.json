@@ -7,8 +7,9 @@
     "start": "node --max-old-space-size=256 server.js",
     "dev": "node --max-old-space-size=256 server.js",
     "code": "node alya-code.js",
-    "test": "node scripts/verify.js",
-    "verify": "node scripts/verify.js"
+    "test": "node scripts/verify.js && node scripts/intelligence-test.js",
+    "verify": "node scripts/verify.js",
+    "test:intelligence": "node scripts/intelligence-test.js"
   },
   "engines": {
     "node": ">=18"

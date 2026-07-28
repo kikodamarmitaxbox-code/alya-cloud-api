@@ -982,7 +982,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/api/history/load') {
       if (!requireAuth(req, res)) return;
       const conversationId = url.searchParams.get('conversationId');
-      const result = loadConversationHistory(conversationId);
+      const result = loadConversationHistory(conversationId, getCurrentUserId(req));
       sendJson(res, 200, result);
       return;
     }
@@ -990,14 +990,14 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'DELETE' && url.pathname === '/api/history/delete') {
       if (!requireAuth(req, res)) return;
       const conversationId = url.searchParams.get('conversationId');
-      const result = deleteConversationHistory(conversationId);
+      const result = deleteConversationHistory(conversationId, getCurrentUserId(req));
       sendJson(res, 200, result);
       return;
     }
 
     if (req.method === 'GET' && url.pathname === '/api/history/list') {
       if (!requireAuth(req, res)) return;
-      const result = listAllConversations();
+      const result = listAllConversations(getCurrentUserId(req));
       sendJson(res, 200, result);
       return;
     }
@@ -1236,11 +1236,21 @@ async function handleLogin(req, res) {
 }
 
 async function handleChat(req, res) {
-  const { safeMessages, settings } = await getSafeRequest(req);
+  const { safeMessages, settings, conversationId } = await getSafeRequest(req);
   const userId = getCurrentUserId(req);
-  const memoryContext = memory.getMemoryContext(userId, safeMessages[safeMessages.length - 1]?.content);
+  const lastUserMessage = [...safeMessages].reverse().find((message) => message.role === 'user')?.content || '';
+  let memoryContext = '';
   try {
-    const reply = await askAssistant(safeMessages, settings, memoryContext);
+    const memoryTurn = memory.processMemoryTurn(userId, lastUserMessage);
+    memoryContext = [
+      memory.getMemoryContext(userId, lastUserMessage),
+      memoryTurn.instruction ? `[INSTRUÇÃO DE MEMÓRIA]\n${memoryTurn.instruction}` : ''
+    ].filter(Boolean).join('\n\n');
+  } catch (error) {
+    logger.warn('Falha não crítica na memória do chat:', error.message);
+  }
+  try {
+    const reply = await askAssistant(safeMessages, settings, memoryContext, { userId, conversationId });
     sendJson(res, 200, { reply: reply || 'Recebi sua mensagem.' });
   } catch (error) {
     logger.error('Chat error:', error);
@@ -1249,16 +1259,26 @@ async function handleChat(req, res) {
 }
 
 async function handleChatStream(req, res) {
-  const { safeMessages, settings } = await getSafeRequest(req);
+  const { safeMessages, settings, conversationId } = await getSafeRequest(req);
   const userId = getCurrentUserId(req);
-  const memoryContext = memory.getMemoryContext(userId, safeMessages[safeMessages.length - 1]?.content);
-  await askAssistantStream(safeMessages, settings, res, memoryContext);
+  const lastUserMessage = [...safeMessages].reverse().find((message) => message.role === 'user')?.content || '';
+  let memoryContext = '';
+  try {
+    const memoryTurn = memory.processMemoryTurn(userId, lastUserMessage);
+    memoryContext = [
+      memory.getMemoryContext(userId, lastUserMessage),
+      memoryTurn.instruction ? `[INSTRUÇÃO DE MEMÓRIA]\n${memoryTurn.instruction}` : ''
+    ].filter(Boolean).join('\n\n');
+  } catch (error) {
+    logger.warn('Falha não crítica na memória do stream:', error.message);
+  }
+  await askAssistantStream(safeMessages, settings, res, memoryContext, { userId, conversationId });
 }
 
 function normalizeAlyReply(reply) {
   if (typeof reply !== 'string') return '';
 
-  let text = reply;
+  let text = reply.replace(/\r\n?/g, '\n');
 
   // Remover tags de raciocínio de modelos como DeepSeek R1
   if (text.includes('</think>')) {
@@ -1272,19 +1292,14 @@ function normalizeAlyReply(reply) {
     return '';
   }
 
-  text = text.replace(/\*\*.*?\*\*/g, (match) => match.slice(2, -2));
-  text = text.replace(/\*.*?\*/g, (match) => match.slice(1, -1));
-  text = text.replace(/`{1,3}[^`]*`{1,3}/g, (match) => match.replace(/`/g, ''));
-  text = text.replace(/\[.*?\]\(.*?\)/g, '$1');
-  text = text.replace(/#{1,6}\s/g, '');
-  text = text.replace(/[-*_]{2,}/g, '');
-  text = text.replace(/\n{3,}/g, '\n\n');
-
-  const emojiRegex = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2000}-\u{206F}\u{FE00}-\u{FE0F}]/gu;
-  text = text.replace(emojiRegex, '');
-
-  text = text.replace(/[•·–—−]+/g, '-');
-  text = text.replace(/\s+/g, ' ').trim();
+  // Preserva Markdown, listas, links, blocos de código e quebras de linha.
+  // A interface já sabe renderizar esse conteúdo; apagar a estrutura reduz a
+  // clareza de respostas técnicas.
+  text = text
+    .replace(/\u0000/g, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 
   return text;
 }
@@ -1295,7 +1310,7 @@ async function handleAlyChat(req, res) {
   const messages = Array.isArray(body.messages) ? body.messages : [];
   const safeMessages = messages
     .filter((message) => message && ['user', 'assistant'].includes(message.role))
-    .slice(-6)
+    .slice(-100)
     .map((message) => ({
       role: message.role,
       content: String(message.content || '').slice(0, 2400)
@@ -1309,11 +1324,18 @@ async function handleAlyChat(req, res) {
   const lastUserMsg = safeMessages[safeMessages.length - 1]?.content || '';
   const userId = getCurrentUserId(req);
 
-  // Extração inteligente de memória em background
-  memory.extractSmartMemories(userId, lastUserMsg);
-
   const settings = normalizeSettings(body.settings || {});
-  let memoryContext = memory.getMemoryContext(userId, lastUserMsg);
+  const conversationId = String(body.conversationId || body.chatId || '').slice(0, 100);
+  let memoryContext = '';
+  try {
+    const memoryTurn = memory.processMemoryTurn(userId, lastUserMsg);
+    memoryContext = [
+      memory.getMemoryContext(userId, lastUserMsg),
+      memoryTurn.instruction ? `[INSTRUÇÃO DE MEMÓRIA]\n${memoryTurn.instruction}` : ''
+    ].filter(Boolean).join('\n\n');
+  } catch (error) {
+    logger.warn('Falha não crítica na memória da Alya:', error.message);
+  }
 
   // Executar hook de plugins (ex: plugin de busca web)
   try {
@@ -1340,7 +1362,7 @@ async function handleAlyChat(req, res) {
   const fallbackReply = 'Estou com dificuldade de responder agora. Tente de novo em alguns segundos.';
 
   try {
-    let reply = await askAssistant(safeMessages, settings, memoryContext);
+    let reply = await askAssistant(safeMessages, settings, memoryContext, { userId, conversationId });
 
     if (/cannot read .* image|model does not support image input|image input not supported/i.test(reply)) {
       reply = imageReply;
@@ -1367,7 +1389,7 @@ async function handleAlyChatStream(req, res) {
   const messages = Array.isArray(body.messages) ? body.messages : [];
   const safeMessages = messages
     .filter((message) => message && ['user', 'assistant'].includes(message.role))
-    .slice(-6)
+    .slice(-100)
     .map((message) => ({
       role: message.role,
       content: String(message.content || '').slice(0, 2400)
@@ -1381,11 +1403,18 @@ async function handleAlyChatStream(req, res) {
   const lastUserMsg = safeMessages[safeMessages.length - 1]?.content || '';
   const userId = getCurrentUserId(req);
 
-  // Extração inteligente de memória em background
-  memory.extractSmartMemories(userId, lastUserMsg);
-
   const settings = normalizeSettings(body.settings || {});
-  let memoryContext = memory.getMemoryContext(userId, lastUserMsg);
+  const conversationId = String(body.conversationId || body.chatId || '').slice(0, 100);
+  let memoryContext = '';
+  try {
+    const memoryTurn = memory.processMemoryTurn(userId, lastUserMsg);
+    memoryContext = [
+      memory.getMemoryContext(userId, lastUserMsg),
+      memoryTurn.instruction ? `[INSTRUÇÃO DE MEMÓRIA]\n${memoryTurn.instruction}` : ''
+    ].filter(Boolean).join('\n\n');
+  } catch (error) {
+    logger.warn('Falha não crítica na memória do stream da Alya:', error.message);
+  }
 
   // Executar hook de plugins
   try {
@@ -1408,7 +1437,7 @@ async function handleAlyChatStream(req, res) {
     } catch {}
   }
 
-  await askAssistantStream(safeMessages, settings, res, memoryContext);
+  await askAssistantStream(safeMessages, settings, res, memoryContext, { userId, conversationId });
   metrics.increment('chatSuccesses');
 }
 
@@ -1507,7 +1536,10 @@ async function handleDiscordReceiveRoute(req, res) {
 
   try {
     const settings = normalizeSettings(body.settings || {});
-    const aiReply = await askAssistant(context, settings);
+    const aiReply = await askAssistant(context, settings, '', {
+      userId: `discord_external`,
+      conversationId: from
+    });
     context.push({ role: 'assistant', content: aiReply, timestamp: Date.now() });
     if (context.length > 20) context.splice(0, context.length - 20);
     await discordManager.storage.set(historyKey, context);
@@ -1616,7 +1648,7 @@ async function handleDiscordCancelRoute(req, res) {
 async function handleSaveHistory(req) {
   const body = await readJsonBody(req);
   const { conversationId, messages } = body;
-  return saveConversationHistory(conversationId, messages);
+  return saveConversationHistory(conversationId, messages, getCurrentUserId(req));
 }
 
 async function handleWriteFile(req) {
