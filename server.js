@@ -430,6 +430,15 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === 'GET' && url.pathname === '/api/code-alya/history') {
+      if (!requireAuth(req, res)) return;
+      await sendCodeAgentResponse(res, () => ({
+        ok: true,
+        actions: codeAgent.getActionHistory(url.searchParams.get('limit'))
+      }));
+      return;
+    }
+
     if (req.method === 'GET' && url.pathname === '/api/code-alya/file') {
       if (!requireAuth(req, res)) return;
       await sendCodeAgentResponse(res, () => ({
@@ -456,6 +465,14 @@ const server = http.createServer(async (req, res) => {
       if (!requireAuth(req, res)) return;
       const body = await readJsonBody(req);
       await sendCodeAgentResponse(res, () => codeAgent.applyCodePlan(body.planId));
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/code-alya/undo') {
+      if (!apiLimiter.check(req, res)) return;
+      if (!requireAuth(req, res)) return;
+      const body = await readJsonBody(req);
+      await sendCodeAgentResponse(res, () => codeAgent.undoCodeAction(body.actionId));
       return;
     }
 

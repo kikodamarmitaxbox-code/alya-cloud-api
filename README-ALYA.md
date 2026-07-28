@@ -49,5 +49,12 @@ Use `/help` para ver os comandos e `/undo` para desfazer a ultima tarefa.
 Abra `http://localhost:3000/code-alya` ou use o botão **Code Alya** dentro da Alya.
 Ela mostra os arquivos do projeto, um editor e um terminal com comandos permitidos.
 No chat, descreva o que quer criar: a Code Alya prepara um plano e só aplica as
-mudanças após você clicar em **Aplicar mudanças**. Antes de escrever, ela salva
-uma cópia do arquivo; `.env`, chaves e pastas internas permanecem bloqueados.
+mudanças após você revisar a prévia e clicar em **Aplicar com backup**. O painel
+guarda a conversa neste navegador, registra as ações e oferece o botão **↶** para
+desfazer a última alteração. Se uma escrita falhar no meio, os arquivos já
+tocados voltam automaticamente à versão anterior.
+
+A Code Alya tenta primeiro o provedor escolhido em `AI_PROVIDER` ou
+`ALYA_CODE_PROVIDER` e troca automaticamente quando ele não responde. `.env`,
+chaves e pastas internas permanecem bloqueados. Use `npm run verify` para
+conferir a integridade do projeto e das proteções.

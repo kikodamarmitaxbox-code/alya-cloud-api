@@ -1,12 +1,34 @@
 'use strict';
 
+const CHAT_STORAGE_KEY = 'code-alya-chat-v1';
+const WELCOME_MESSAGE = 'Oi, Pedro! Me conta o que você quer criar. Eu converso com você, analiso o projeto e programo quando você pedir.';
+
+function loadStoredChatHistory() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CHAT_STORAGE_KEY) || '[]');
+    const messages = Array.isArray(parsed)
+      ? parsed
+        .filter((item) => item && ['user', 'assistant'].includes(item.role))
+        .map((item) => ({
+          role: item.role,
+          content: String(item.content || '').slice(0, 4000)
+        }))
+        .slice(-40)
+      : [];
+    return messages.length ? messages : [{ role: 'assistant', content: WELCOME_MESSAGE }];
+  } catch {
+    return [{ role: 'assistant', content: WELCOME_MESSAGE }];
+  }
+}
+
 const state = {
   workspace: null,
   openFiles: new Map(),
   activePath: '',
   busy: false,
   terminalOpen: true,
-  chatHistory: [{ role: 'assistant', content: 'Oi, Pedro! Me conta o que você quer criar. Eu converso com você, analiso o projeto e programo quando você pedir.' }]
+  lastActionId: '',
+  chatHistory: loadStoredChatHistory()
 };
 
 const projectName = document.querySelector('#projectName');
@@ -33,6 +55,22 @@ const terminalInput = document.querySelector('#terminalInput');
 const terminalOutput = document.querySelector('#terminalOutput');
 const toast = document.querySelector('#toast');
 const assistantPanel = document.querySelector('#assistantPanel');
+const undoLastButton = document.querySelector('#undoLastButton');
+const newChatButton = document.querySelector('#newChatButton');
+
+function persistChatHistory() {
+  try {
+    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(state.chatHistory.slice(-40)));
+  } catch {
+    // O chat continua funcionando mesmo quando o navegador bloqueia armazenamento.
+  }
+}
+
+function rememberMessage(role, content) {
+  state.chatHistory.push({ role, content: String(content || '').slice(0, 4000) });
+  state.chatHistory = state.chatHistory.slice(-40);
+  persistChatHistory();
+}
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -76,10 +114,26 @@ async function loadWorkspace() {
     projectName.textContent = data.name;
     modelBadge.innerHTML = `<i></i>${escapeHtml(data.model)}`;
     renderTree();
+    await loadActionHistory();
   } catch (error) {
     fileTree.innerHTML = `<div class="message-content">${escapeHtml(error.message)} <a href="/aly">Voltar para entrar</a></div>`;
     modelBadge.textContent = 'Offline';
     showToast(error.message, 'error');
+  }
+}
+
+async function loadActionHistory() {
+  try {
+    const data = await api('/api/code-alya/history?limit=12');
+    const undoable = (data.actions || []).find((entry) => entry.canUndo);
+    state.lastActionId = undoable?.id || '';
+    undoLastButton.disabled = !state.lastActionId;
+    undoLastButton.title = state.lastActionId
+      ? 'Desfazer a última alteração'
+      : 'Nenhuma alteração para desfazer';
+  } catch {
+    state.lastActionId = '';
+    undoLastButton.disabled = true;
   }
 }
 
@@ -228,14 +282,17 @@ async function saveActiveFile() {
   saveFileButton.disabled = true;
   saveStatus.textContent = 'Salvando...';
   try {
-    await api('/api/code-alya/file', {
+    const data = await api('/api/code-alya/file', {
       method: 'POST',
       body: JSON.stringify({ path: file.path, content: file.content })
     });
+    state.lastActionId = data.actionId || state.lastActionId;
+    undoLastButton.disabled = !state.lastActionId;
     file.savedContent = file.content;
     file.dirty = false;
     saveStatus.textContent = 'Salvo';
     renderTabs();
+    await loadActionHistory();
     setTimeout(() => { saveStatus.textContent = ''; }, 1800);
   } catch (error) {
     saveStatus.textContent = '';
@@ -265,23 +322,55 @@ function addThinking() {
   return article;
 }
 
+function restoreChatHistory() {
+  if (
+    state.chatHistory.length === 1 &&
+    state.chatHistory[0].role === 'assistant' &&
+    state.chatHistory[0].content === WELCOME_MESSAGE
+  ) return;
+  chatMessages.innerHTML = '';
+  for (const message of state.chatHistory) addMessage(message.role, message.content);
+}
+
 function renderPlan(data) {
   modelBadge.innerHTML = `<i></i>${escapeHtml(data.model)}`;
+  const previews = new Map((data.preview || []).map((preview) => [preview.path, preview]));
+  const hasWrites = data.actions.some((action) => action.type === 'write');
+  const hasImportantCommand = data.actions.some((action) => (
+    action.type === 'command' &&
+    /^(?:npm\s+install|git\s+(?:commit|push))\b/i.test(action.command || '')
+  ));
   const actionsHtml = data.actions.map((action) => {
     if (action.type === 'write') {
-      return `<div class="plan-action"><span>✎</span><b>${escapeHtml(action.path)}</b><span>${action.lines} linhas</span></div>`;
+      const preview = previews.get(action.path);
+      const changeLabel = preview?.status === 'create'
+        ? 'novo arquivo'
+        : `+${preview?.addedLines || 0} −${preview?.removedLines || 0}`;
+      const previewHtml = preview
+        ? `<details class="plan-preview">
+            <summary>Ver prévia de ${escapeHtml(action.path)}</summary>
+            <div class="preview-stats"><span>${escapeHtml(changeLabel)}</span><span>${preview.beforeLines} → ${preview.afterLines} linhas</span></div>
+            <pre>${escapeHtml(preview.snippet || '[arquivo sem conteúdo]')}</pre>
+          </details>`
+        : '';
+      return `<div class="plan-write-block">
+        <div class="plan-action"><span>✎</span><b>${escapeHtml(action.path)}</b><span>${escapeHtml(changeLabel)}</span></div>
+        ${previewHtml}
+      </div>`;
     }
     return `<div class="plan-action"><span>›_</span><b>${escapeHtml(action.command)}</b></div>`;
   }).join('');
   const planHtml = data.planId
     ? `<div class="plan-card">
-        <div class="plan-head"><strong>Plano pronto para aplicar</strong><span>${escapeHtml(data.model)}</span></div>
+        <div class="plan-head"><strong>${hasWrites ? 'Revisão pronta' : 'Verificações prontas'}</strong><span>${escapeHtml(data.model)}</span></div>
         <div class="plan-actions">${actionsHtml}</div>
-        <button class="plan-apply" type="button" data-plan="${escapeHtml(data.planId)}">Aplicar mudanças</button>
+        <button class="plan-apply" type="button" data-plan="${escapeHtml(data.planId)}" data-has-writes="${hasWrites}" data-important-command="${hasImportantCommand}">
+          ${hasWrites ? 'Aplicar com backup' : 'Executar verificações'}
+        </button>
       </div>`
     : '';
   const article = addMessage('assistant', data.summary, planHtml);
-  state.chatHistory.push({ role: 'assistant', content: data.summary });
+  rememberMessage('assistant', data.summary);
   article.querySelector('[data-plan]')?.addEventListener('click', applyPlan);
 }
 
@@ -291,7 +380,7 @@ async function sendCodeRequest(message) {
   state.busy = true;
   sendCodeButton.disabled = true;
   codePromptInput.value = '';
-  state.chatHistory.push({ role: 'user', content: clean });
+  rememberMessage('user', clean);
   addMessage('user', clean);
   const thinking = addThinking();
   try {
@@ -308,6 +397,7 @@ async function sendCodeRequest(message) {
   } catch (error) {
     thinking.remove();
     addMessage('assistant', error.message);
+    rememberMessage('assistant', error.message);
     showToast(error.message, 'error');
   } finally {
     state.busy = false;
@@ -318,8 +408,18 @@ async function sendCodeRequest(message) {
 
 async function applyPlan(event) {
   const button = event.currentTarget;
+  const hasWrites = button.dataset.hasWrites === 'true';
+  const hasImportantCommand = button.dataset.importantCommand === 'true';
+  if (
+    (hasWrites || hasImportantCommand) &&
+    !window.confirm(
+      hasImportantCommand
+        ? 'Este plano instala pacotes ou envia alterações pelo Git. Revise os comandos acima e confirme para continuar.'
+        : 'Aplicar estas mudanças? A Code Alya criará um backup para você poder desfazer.'
+    )
+  ) return;
   button.disabled = true;
-  button.textContent = 'Aplicando e testando...';
+  button.textContent = hasWrites ? 'Aplicando e testando...' : 'Executando verificações...';
   try {
     const data = await api('/api/code-alya/apply', {
       method: 'POST',
@@ -335,15 +435,61 @@ async function applyPlan(event) {
         await openFile(filePath);
       }
     }
-    button.textContent = '✓ Mudanças aplicadas';
-    addMessage('assistant', `${data.changedFiles.length} arquivo(s) atualizado(s). ${data.ok ? 'As verificações terminaram.' : 'Uma verificação encontrou um problema; veja o terminal.'}`);
+    state.lastActionId = data.canUndo ? data.actionId : state.lastActionId;
+    undoLastButton.disabled = !state.lastActionId;
+    button.textContent = hasWrites ? '✓ Mudanças aplicadas' : '✓ Verificações concluídas';
+    const resultMessage = `${data.changedFiles.length} arquivo(s) atualizado(s). ${
+      data.ok
+        ? 'As verificações terminaram.'
+        : 'Uma verificação encontrou um problema; veja o terminal.'
+    }${data.canUndo ? ' Você pode desfazer pelo botão ↶ no topo do chat.' : ''}`;
+    addMessage('assistant', resultMessage);
+    rememberMessage('assistant', resultMessage);
     await loadWorkspace();
-    showToast('Mudanças aplicadas com backup automático.');
+    showToast(hasWrites ? 'Mudanças aplicadas com backup automático.' : 'Verificações concluídas.');
   } catch (error) {
     button.disabled = false;
-    button.textContent = 'Tentar aplicar novamente';
+    button.textContent = hasWrites ? 'Tentar aplicar novamente' : 'Tentar verificar novamente';
     showToast(error.message, 'error');
   }
+}
+
+async function undoLastChange() {
+  if (!state.lastActionId) return;
+  if (!window.confirm('Desfazer a última alteração feita pela Code Alya?')) return;
+  undoLastButton.disabled = true;
+  try {
+    const data = await api('/api/code-alya/undo', {
+      method: 'POST',
+      body: JSON.stringify({ actionId: state.lastActionId })
+    });
+    for (const filePath of data.restoredFiles || []) {
+      state.openFiles.delete(filePath);
+      if (state.activePath === filePath) state.activePath = '';
+    }
+    renderEditor();
+    await loadWorkspace();
+    addMessage('assistant', data.message);
+    rememberMessage('assistant', data.message);
+    showToast('Alteração desfeita com segurança.');
+  } catch (error) {
+    showToast(error.message, 'error');
+    await loadActionHistory();
+  }
+}
+
+function startNewChat() {
+  if (state.busy) return;
+  if (
+    state.chatHistory.some((message) => message.role === 'user') &&
+    !window.confirm('Começar uma conversa nova? O histórico atual será limpo deste navegador.')
+  ) return;
+  state.chatHistory = [{ role: 'assistant', content: WELCOME_MESSAGE }];
+  persistChatHistory();
+  chatMessages.innerHTML = '';
+  addMessage('assistant', WELCOME_MESSAGE);
+  codePromptInput.focus();
+  showToast('Nova conversa iniciada.');
 }
 
 function appendTerminal(text, className = '') {
@@ -433,6 +579,8 @@ document.querySelector('#toggleTerminalButton').addEventListener('click', () => 
 });
 document.querySelector('#mobileChatButton').addEventListener('click', () => assistantPanel.classList.add('open'));
 document.querySelector('#closeMobileChatButton').addEventListener('click', () => assistantPanel.classList.remove('open'));
+undoLastButton.addEventListener('click', undoLastChange);
+newChatButton.addEventListener('click', startNewChat);
 
 window.addEventListener('beforeunload', (event) => {
   if ([...state.openFiles.values()].some((file) => file.dirty)) {
@@ -441,4 +589,5 @@ window.addEventListener('beforeunload', (event) => {
   }
 });
 
+restoreChatHistory();
 loadWorkspace();

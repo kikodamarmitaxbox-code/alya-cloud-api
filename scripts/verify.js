@@ -24,6 +24,18 @@ function verifySyntax() {
   }
 }
 
+function verifyCodeAlyaInterface() {
+  const html = fs.readFileSync(path.join(root, 'public', 'code-alya.html'), 'utf8');
+  const client = fs.readFileSync(path.join(root, 'public', 'code-alya.js'), 'utf8');
+  const referencedIds = [...client.matchAll(/querySelector\(['"]#([^'"]+)['"]\)/g)]
+    .map((match) => match[1]);
+  for (const id of new Set(referencedIds)) {
+    if (!new RegExp(`id=["']${id}["']`).test(html)) {
+      throw new Error(`Elemento da Code Alya ausente na interface: #${id}`);
+    }
+  }
+}
+
 async function verifySafety() {
   const fileOps = require('../lib/fileOps');
   const codeAgent = require('../lib/codeAgent');
@@ -50,13 +62,30 @@ async function verifySafety() {
   if (!workspace.ok || !Array.isArray(workspace.files) || !workspace.files.includes('server.js')) {
     throw new Error('A Code Alya não conseguiu ler o projeto.');
   }
+  if (
+    typeof codeAgent.getActionHistory !== 'function' ||
+    typeof codeAgent.undoCodeAction !== 'function'
+  ) {
+    throw new Error('O histórico ou o recurso de desfazer da Code Alya não está disponível.');
+  }
 
   const command = await codeAgent.runSafeCommand('node --check server.js');
   if (!command.ok) throw new Error(`A validação do servidor falhou: ${command.output}`);
+
+  let protectedCommandBlocked = false;
+  try {
+    await codeAgent.runSafeCommand('rg token .env');
+  } catch (error) {
+    protectedCommandBlocked = /protegida|protegido/i.test(error.message);
+  }
+  if (!protectedCommandBlocked) {
+    throw new Error('O terminal seguro aceitou uma busca em arquivo secreto.');
+  }
 }
 
 (async () => {
   verifySyntax();
+  verifyCodeAlyaInterface();
   await verifySafety();
   console.log('Verificação concluída: Alya e Code Alya estão prontas para uso.');
 })().catch((error) => {

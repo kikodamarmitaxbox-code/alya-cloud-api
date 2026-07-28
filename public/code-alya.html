@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/code-alya.css?v=20260727d" />
+  <link rel="stylesheet" href="/code-alya.css?v=20260728a" />
 </head>
 <body>
   <div class="code-app">
@@ -114,7 +114,11 @@
             <div class="alya-avatar"><img src="/images/alya-avatar.png" alt="Alya" /><i></i></div>
             <div><strong>Chat com Alya</strong><span>Converse e programe comigo</span></div>
           </div>
-          <button id="closeMobileChatButton" class="close-mobile-chat" type="button">×</button>
+          <div class="assistant-header-actions">
+            <button id="undoLastButton" class="assistant-tool" type="button" title="Nenhuma alteração para desfazer" aria-label="Desfazer última alteração" disabled>↶</button>
+            <button id="newChatButton" class="assistant-tool" type="button" title="Nova conversa" aria-label="Começar nova conversa">＋</button>
+            <button id="closeMobileChatButton" class="close-mobile-chat" type="button" aria-label="Fechar chat">×</button>
+          </div>
         </header>
 
         <div id="chatMessages" class="chat-messages">
@@ -149,6 +153,6 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/code-alya.js?v=20260727d"></script>
+  <script src="/code-alya.js?v=20260728a"></script>
 </body>
 </html>
