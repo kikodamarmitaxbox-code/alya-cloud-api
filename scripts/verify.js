@@ -76,6 +76,37 @@ async function verifySafety() {
     throw new Error('O projeto principal da Code Alya não está disponível.');
   }
 
+  const testProjectName = `Verificação Alya ${Date.now()}`;
+  const createdProject = codeAgent.createProject(testProjectName).project;
+  const projectsRoot = path.resolve(root, 'projects');
+  const testProjectRoot = path.resolve(projectsRoot, createdProject.id);
+  const projectRelative = path.relative(projectsRoot, testProjectRoot);
+  if (projectRelative.startsWith('..') || path.isAbsolute(projectRelative)) {
+    throw new Error('O projeto temporário saiu da pasta segura.');
+  }
+  try {
+    const projectReadme = codeAgent.readProjectFile('README.md', 50000, createdProject.id);
+    if (!projectReadme.content.includes(testProjectName)) {
+      throw new Error('O projeto separado não conseguiu ler o próprio arquivo.');
+    }
+    let crossProjectBlocked = false;
+    try {
+      codeAgent.readProjectFile(`projects/${createdProject.id}/README.md`, 50000, 'main');
+    } catch (error) {
+      crossProjectBlocked = /projeto correto/i.test(error.message);
+    }
+    if (!crossProjectBlocked) {
+      throw new Error('Um projeto conseguiu atravessar o isolamento de arquivos.');
+    }
+  } finally {
+    const entries = fs.readdirSync(testProjectRoot);
+    if (entries.length !== 1 || entries[0] !== 'README.md') {
+      throw new Error('O projeto temporário contém arquivos inesperados e não foi removido.');
+    }
+    fs.unlinkSync(path.join(testProjectRoot, 'README.md'));
+    fs.rmdirSync(testProjectRoot);
+  }
+
   const command = await codeAgent.runSafeCommand('node --check server.js');
   if (!command.ok) throw new Error(`A validação do servidor falhou: ${command.output}`);
 
