@@ -14,9 +14,20 @@ const {
   getInstantReply,
   getProviderOrder,
   getRequestTimeout,
+  reviseLowQualityResponse,
   runProviderChain,
   safeProviderMessage
 } = require('../lib/chat');
+const {
+  assessResponseQuality,
+  chooseBetterResponse,
+  redactSecrets,
+  requiresBufferedReview
+} = require('../lib/responseQuality');
+const {
+  retrieveProjectKnowledge,
+  formatProjectKnowledge
+} = require('../lib/projectKnowledge');
 const memory = require('../lib/memory');
 const history = require('../lib/history');
 const store = require('../lib/persistentStore');
@@ -83,6 +94,59 @@ async function testPromptAdaptation() {
   assert.match(discordPrompt, /sem ofensas/i);
 }
 
+async function testSelectiveQualityReview() {
+  const messages = [{
+    role: 'user',
+    content: 'Analise esse erro complexo no server.js, encontre a causa e diga como testar.'
+  }];
+  const settings = { taskIntent: 'debugging', taskComplexity: 'complex' };
+  const weak = assessResponseQuality('Tente novamente.', settings, messages);
+  assert.strictEqual(weak.needsRevision, true);
+  assert.strictEqual(requiresBufferedReview(settings), true);
+
+  const strongReply = [
+    'A causa provável está no início duplicado do servidor no arquivo `server.js`.',
+    'Confirme qual processo ocupa a porta, encerre somente a instância antiga e inicie novamente.',
+    'Depois execute `npm test` e faça uma requisição para `/health` para verificar.'
+  ].join(' ');
+  const selected = chooseBetterResponse('Tente novamente.', strongReply, settings, messages);
+  assert.strictEqual(selected.text, strongReply);
+
+  const revised = await reviseLowQualityResponse({
+    result: { reply: 'Tente novamente.', provider: 'first' },
+    candidates: ['first', 'second'],
+    calls: {
+      first: async () => 'Tente novamente.',
+      second: async () => strongReply
+    },
+    preferred: 'first',
+    messages,
+    settings,
+    memoryContext: ''
+  });
+  assert.strictEqual(revised.reply, strongReply);
+  assert.strictEqual(revised.revised, true);
+  assert.ok(!redactSecrets(`chave sk-${'x'.repeat(24)}`).includes(`sk-${'x'.repeat(24)}`));
+}
+
+async function testProjectKnowledgeRetrieval() {
+  const files = ['server.js', 'lib/auth.js', 'public/theme.css'];
+  const contents = {
+    'server.js': 'const auth = require("./lib/auth");\nfunction startServer() { return auth.requireLogin(); }',
+    'lib/auth.js': 'function requireLogin(session) { if (!session) throw new Error("login obrigatório"); }',
+    'public/theme.css': '.button { color: purple; }'
+  };
+  const entries = retrieveProjectKnowledge({
+    query: 'corrija o erro de login e sessão na autenticação',
+    files,
+    readFile: (file) => contents[file],
+    limit: 2
+  });
+  assert.ok(entries.some((entry) => entry.path === 'lib/auth.js'));
+  assert.ok(!entries.some((entry) => entry.path === 'public/theme.css'));
+  assert.match(formatProjectKnowledge(entries), /login obrigatório/i);
+}
+
 async function testLongConversation() {
   const messages = [];
   for (let index = 0; index < 24; index += 1) {
@@ -142,10 +206,24 @@ async function testMemorySafetyAndIsolation() {
   const confirmed = memory.processMemoryTurn(userA, 'sim');
   assert.strictEqual(confirmed.saved, true);
   assert.ok(memory.getMemoryContext(userA, 'respostas').includes('respostas curtas'));
+  const preference = memory.getAllPermanentMemory(userA)
+    .find((item) => /respostas curtas/i.test(item.text));
+  assert.ok(preference.importance >= 0.8);
+  assert.ok(preference.useCount >= 1);
   assert.strictEqual(memory.getAllPermanentMemory(userB).length, 0);
 
   const explicit = memory.processMemoryTurn(userA, 'Lembre que meu projeto se chama Aurora');
   assert.strictEqual(explicit.saved, true);
+  const duplicate = memory.addPermanentMemory(userA, 'Meu projeto se chama Aurora', 'projects');
+  assert.ok(duplicate);
+  assert.strictEqual(
+    memory.getAllPermanentMemory(userA).filter((item) => /projeto se chama Aurora/i.test(item.text)).length,
+    1
+  );
+
+  const temporary = memory.addPermanentMemory(userA, 'Hoje prefiro respostas bem curtas', 'preferences');
+  assert.ok(temporary.expiresAt);
+  assert.strictEqual(memory.isExpiredMemory({ expiresAt: '2000-01-01T00:00:00.000Z' }), true);
 
   const fakeSecret = `sk-${'a'.repeat(24)}`;
   const sensitive = memory.processMemoryTurn(userA, `Lembre que minha senha: ${fakeSecret}`);
@@ -197,6 +275,8 @@ async function main() {
   const tests = [
     ['conversa normal e prompt', testNormalConversation],
     ['adaptação do prompt à tarefa', testPromptAdaptation],
+    ['revisão seletiva de qualidade', testSelectiveQualityReview],
+    ['conhecimento relevante dos projetos', testProjectKnowledgeRetrieval],
     ['conversa longa e resumo', testLongConversation],
     ['pergunta de código e roteamento', testCodeIntent],
     ['busca web somente quando necessária', testSearchOnlyWhenNeeded],
