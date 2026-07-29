@@ -41,7 +41,6 @@ const {
   ensureBootstrapAdmin
 } = require('./lib/users');
 const userFiles = require('./lib/userFiles');
-const { redeemInvitation } = require('./lib/invitations');
 const notifications = require('./lib/notifications');
 const computerControl = require('./lib/computerControl');
 const persistentStore = require('./lib/persistentStore');
@@ -1327,7 +1326,7 @@ async function handleLogin(req, res) {
 
 async function handleRegistration(req, res) {
   const body = await readJsonBody(req);
-  const result = await redeemInvitation(body.inviteCode, body.username, body.password);
+  const result = await createUser(body.username, body.password, { role: 'user' });
 
   if (!result.ok) {
     metrics.increment('registrationFailures');

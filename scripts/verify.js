@@ -11,7 +11,6 @@ const requiredFiles = [
   'lib/chat.js',
   'lib/codeAgent.js',
   'lib/persistentStore.js',
-  'lib/invitations.js',
   'lib/userFiles.js',
   'lib/fileOps.js',
   'lib/plugins.js',

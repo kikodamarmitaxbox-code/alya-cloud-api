@@ -88,8 +88,6 @@ const authUsername = document.querySelector('#authUsername');
 const authPassword = document.querySelector('#authPassword');
 const authPasswordConfirmation = document.querySelector('#authPasswordConfirmation');
 const authPasswordConfirmationLabel = document.querySelector('#authPasswordConfirmationLabel');
-const authInviteCode = document.querySelector('#authInviteCode');
-const authInviteCodeLabel = document.querySelector('#authInviteCodeLabel');
 const authTitle = document.querySelector('#authTitle');
 const authDescription = document.querySelector('#authDescription');
 const authSubmitButton = document.querySelector('#authSubmitButton');
@@ -160,19 +158,16 @@ function setAuthScreenMode(mode) {
   const registering = authScreenMode === 'register';
   authTitle.textContent = registering ? 'Criar minha conta' : 'Entrar na Alya';
   authDescription.textContent = registering
-    ? 'Use o código de convite enviado pelo administrador.'
-    : 'Este espaço é privado. Entre para continuar.';
+    ? 'Escolha seu usuário e crie uma senha segura.'
+    : 'Entre com sua conta para continuar.';
   authSubmitButton.textContent = registering ? 'Criar conta' : 'Entrar';
   authSwitchButton.textContent = registering ? 'Voltar para entrar' : 'Cadastrar';
   authPassword.autocomplete = registering ? 'new-password' : 'current-password';
   authPasswordConfirmationLabel.hidden = !registering;
-  authInviteCodeLabel.hidden = !registering;
   authPasswordConfirmation.required = registering;
-  authInviteCode.required = registering;
   authStatus.textContent = '';
   authPassword.value = '';
   authPasswordConfirmation.value = '';
-  authInviteCode.value = '';
   setTimeout(() => authUsername?.focus(), 50);
 }
 
@@ -238,8 +233,7 @@ async function submitAuthentication(event) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         username: authUsername.value.trim(),
-        password: authPassword.value,
-        ...(registering ? { inviteCode: authInviteCode.value.trim() } : {})
+        password: authPassword.value
       })
     });
     const data = await response.json().catch(() => ({}));
@@ -248,7 +242,6 @@ async function submitAuthentication(event) {
     authModal.hidden = true;
     authPassword.value = '';
     authPasswordConfirmation.value = '';
-    authInviteCode.value = '';
     showToast(registering ? 'Conta criada. Bem-vindo à Alya.' : 'Acesso liberado. Bem-vindo à Alya.', 'success');
     refreshProviderStatus(false);
   } catch (error) {

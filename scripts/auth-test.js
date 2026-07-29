@@ -26,7 +26,6 @@ const {
 const history = require('../lib/history');
 const memory = require('../lib/memory');
 const userFiles = require('../lib/userFiles');
-const { createInvitation } = require('../lib/invitations');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -117,8 +116,6 @@ async function main() {
   try {
     assert((await createUser(admin, adminPassword, { role: 'admin' })).ok, 'Falha ao criar administrador de teste.');
     assert((await createUser(friend, friendPassword, { role: 'user' })).ok, 'Falha ao criar amigo de teste.');
-    const invitation = createInvitation(invited);
-    assert(invitation.ok && invitation.code, 'Falha ao criar convite de cadastro.');
     await store.flush();
 
     const wrong = await validateLogin(admin, `${adminPassword}x`);
@@ -147,26 +144,19 @@ async function main() {
     });
     assert(invalid.status === 401 && invalid.data.error === INVALID_LOGIN_MESSAGE, 'Login incorreto revelou uma mensagem diferente.');
 
-    const registrationWithoutInvite = await request(baseUrl, '/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '127.0.0.2' },
-      body: { username: invited, password: invitedPassword, inviteCode: 'codigo-invalido' }
-    });
-    assert(registrationWithoutInvite.status === 400, 'Cadastro sem convite válido foi aceito.');
-
     const registration = await request(baseUrl, '/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '127.0.0.2' },
-      body: { username: invited, password: invitedPassword, inviteCode: invitation.code }
+      body: { username: invited, password: invitedPassword }
     });
-    assert(registration.status === 201 && registration.cookie, 'Cadastro com convite não criou uma sessão individual.');
+    assert(registration.status === 201 && registration.cookie, 'Cadastro individual não criou uma sessão.');
 
-    const reusedInvitation = await request(baseUrl, '/api/auth/register', {
+    const duplicateRegistration = await request(baseUrl, '/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '127.0.0.2' },
-      body: { username: `${invited}x`.slice(0, 32), password: invitedPassword, inviteCode: invitation.code }
+      body: { username: invited, password: invitedPassword }
     });
-    assert(reusedInvitation.status === 400, 'Um convite de uso único foi reutilizado.');
+    assert(duplicateRegistration.status === 400, 'Foi possível cadastrar o mesmo usuário duas vezes.');
 
     const adminLogin = await request(baseUrl, '/api/auth/login', {
       method: 'POST',
