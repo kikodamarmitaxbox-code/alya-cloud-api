@@ -14,8 +14,10 @@ process.env.NODE_ENV = 'test';
 const root = path.resolve(__dirname, '..');
 const store = require('../lib/persistentStore');
 const {
+  MIN_PASSWORD_LENGTH,
   createUser,
-  deleteUser
+  deleteUser,
+  validatePassword
 } = require('../lib/users');
 const {
   INVALID_LOGIN_MESSAGE,
@@ -106,6 +108,7 @@ async function main() {
   const admin = `testadmin_${suffix}`.slice(0, 32);
   const friend = `testfriend_${suffix}`.slice(0, 32);
   const invited = `testinvite_${suffix}`.slice(0, 32);
+  const minimumPasswordUser = `testfive_${suffix}`.slice(0, 32);
   const adminPassword = crypto.randomBytes(24).toString('base64url');
   const friendPassword = crypto.randomBytes(24).toString('base64url');
   const invitedPassword = crypto.randomBytes(24).toString('base64url');
@@ -114,6 +117,17 @@ async function main() {
   let child = null;
 
   try {
+    assert(MIN_PASSWORD_LENGTH === 5, 'O mínimo de senha deveria ser cinco caracteres.');
+    assert(Boolean(validatePassword('1234')), 'Uma senha com quatro caracteres foi aceita.');
+    assert(!validatePassword('12345'), 'Uma senha com cinco caracteres foi recusada.');
+    assert(
+      (await createUser(minimumPasswordUser, '12345', { role: 'user' })).ok,
+      'Não foi possível criar uma conta com senha de cinco caracteres.'
+    );
+    assert(
+      (await validateLogin(minimumPasswordUser, '12345')).success,
+      'A conta com senha de cinco caracteres não conseguiu entrar.'
+    );
     assert((await createUser(admin, adminPassword, { role: 'admin' })).ok, 'Falha ao criar administrador de teste.');
     assert((await createUser(friend, friendPassword, { role: 'user' })).ok, 'Falha ao criar amigo de teste.');
     await store.flush();
@@ -323,6 +337,7 @@ async function main() {
     cleanupUserData(admin, conversationId);
     cleanupUserData(friend, conversationId);
     cleanupUserData(invited, conversationId);
+    cleanupUserData(minimumPasswordUser, conversationId);
     await store.flush();
   }
 }
