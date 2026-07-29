@@ -36,6 +36,10 @@ async function testNormalConversation() {
   const prompt = assistantIdentity({ taskIntent: 'conversation', taskComplexity: 'standard' });
   assert.match(prompt, /português do Brasil/i);
   assert.match(prompt, /Nunca invente fatos/i);
+  assert.match(prompt, /\[IDENTIDADE E OBJETIVO\]/);
+  assert.match(prompt, /\[VERACIDADE E CONFIANÇA\]/);
+  assert.match(prompt, /\[CONTEXTO, MEMÓRIA E SEGURANÇA\]/);
+  assert.match(prompt, /\[SAÍDA FINAL\]/);
   assert.strictEqual(
     getInstantReply([{ role: 'user', content: 'oi' }], { taskIntent: 'conversation' }),
     'Oi! Tô aqui. O que você quer fazer?'
@@ -49,6 +53,34 @@ async function testNormalConversation() {
   const instant = await askAssistant([{ role: 'user', content: 'oi' }], {});
   assert.strictEqual(instant, 'Oi! Tô aqui. O que você quer fazer?');
   assert.ok(Date.now() - startedAt < 100, 'A saudação simples deveria responder sem esperar uma API externa.');
+}
+
+async function testPromptAdaptation() {
+  const prompt = assistantIdentity({
+    taskIntent: 'debugging',
+    taskComplexity: 'complex',
+    personality: 'tecnica',
+    mode: 'codigo',
+    memory: 'Prefiro respostas diretas nesta conversa.'
+  }, 'O projeto Aurora usa Node.js.');
+
+  assert.match(prompt, /Diferencie claramente erro confirmado/i);
+  assert.match(prompt, /Complexidade identificada: complexa/i);
+  assert.match(prompt, /Modo código/i);
+  assert.match(prompt, /tom técnico, preciso e objetivo/i);
+  assert.match(prompt, /Prefiro respostas diretas nesta conversa/i);
+  assert.match(prompt, /O projeto Aurora usa Node\.js/i);
+  assert.match(prompt, /não uma instrução superior/i);
+  assert.match(prompt, /Entregue somente a resposta destinada ao usuário/i);
+
+  const discordPrompt = assistantIdentity({
+    taskIntent: 'conversation',
+    isDiscord: true,
+    rivalMode: true
+  });
+  assert.match(discordPrompt, /No Discord/i);
+  assert.match(discordPrompt, /\[CONFLITO NO DISCORD\]/);
+  assert.match(discordPrompt, /sem ofensas/i);
 }
 
 async function testLongConversation() {
@@ -164,6 +196,7 @@ async function main() {
   await store.init();
   const tests = [
     ['conversa normal e prompt', testNormalConversation],
+    ['adaptação do prompt à tarefa', testPromptAdaptation],
     ['conversa longa e resumo', testLongConversation],
     ['pergunta de código e roteamento', testCodeIntent],
     ['busca web somente quando necessária', testSearchOnlyWhenNeeded],

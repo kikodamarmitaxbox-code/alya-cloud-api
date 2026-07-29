@@ -9,6 +9,7 @@ const requiredFiles = [
   'server.js',
   'lib/auth.js',
   'lib/chat.js',
+  'lib/systemPrompt.js',
   'lib/codeAgent.js',
   'lib/persistentStore.js',
   'lib/userFiles.js',
