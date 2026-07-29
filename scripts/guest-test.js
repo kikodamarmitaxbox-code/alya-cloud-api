@@ -146,6 +146,10 @@ async function main() {
     });
     assert(login.status === 410 && register.status === 410, 'Login ou cadastro ainda está ativo no modo público.');
 
+    const removedGame = await request(baseUrl, '/game');
+    const removedGameFile = await request(baseUrl, '/game.html');
+    assert(removedGame.status === 404 && removedGameFile.status === 404, 'O jogo removido ainda está acessível.');
+
     process.stdout.write('Acesso sem login verificado: entrada automática, navegadores isolados e administração bloqueada.\n');
   } finally {
     await stopServer(child);

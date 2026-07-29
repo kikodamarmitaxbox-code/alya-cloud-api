@@ -773,12 +773,6 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (req.method === 'GET' && url.pathname === '/game') {
-      if (!requireAuthPage(req, res)) return;
-      serveGameStatic(res);
-      return;
-    }
-
     if (req.method === 'GET' && url.pathname === '/api/aly-link') {
       await handleAlyLink(req, res);
       return;
@@ -1201,12 +1195,6 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/' || url.pathname === '/index.html') {
       res.writeHead(302, { Location: '/aly', 'Cache-Control': 'no-store' });
       res.end();
-      return;
-    }
-
-    if (url.pathname === '/game.html') {
-      if (!requireAuthPage(req, res)) return;
-      serveGameStatic(res);
       return;
     }
 
@@ -1656,22 +1644,6 @@ function serveAlyStatic(res) {
   fs.readFile(filePath, (error, data) => {
     if (error) {
       sendText(res, 404, 'Pagina publica nao encontrada.');
-      return;
-    }
-
-    res.writeHead(200, {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Cache-Control': 'no-store'
-    });
-    res.end(data);
-  });
-}
-
-function serveGameStatic(res) {
-  const filePath = path.join(publicDir, 'game.html');
-  fs.readFile(filePath, (error, data) => {
-    if (error) {
-      sendText(res, 404, 'Jogo nao encontrado.');
       return;
     }
 

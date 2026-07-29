@@ -158,8 +158,7 @@ async function main() {
     const blocked = await request(baseUrl, '/api/history/list');
     assert(blocked.status === 401, 'Rota privada aceitou acesso sem login.');
     const blockedCodePage = await request(baseUrl, '/code-alya.html');
-    const blockedGamePage = await request(baseUrl, '/game.html');
-    assert(blockedCodePage.status === 302 && blockedGamePage.status === 302, 'Uma página privada abriu sem login.');
+    assert(blockedCodePage.status === 302, 'Uma página administrativa abriu sem login.');
 
     const invalid = await request(baseUrl, '/api/auth/login', {
       method: 'POST',
