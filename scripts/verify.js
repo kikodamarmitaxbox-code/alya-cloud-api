@@ -19,6 +19,7 @@ const requiredFiles = [
   'lib/fileOps.js',
   'lib/plugins.js',
   'scripts/device-test.js',
+  'scripts/guest-test.js',
   'scripts/alya-device.js',
   'scripts/setup-device.js',
   'public/aly.js',

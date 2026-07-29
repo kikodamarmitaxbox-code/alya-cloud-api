@@ -8,9 +8,12 @@ const logger = require('./lib/logger');
 const {
   isAuthenticated,
   isAuthConfigured,
+  isGuestMode,
   validateLogin,
   setAuthCookie,
   clearAuthCookie,
+  clearGuestCookie,
+  ensureGuestSession,
   getAuthenticatedUser,
   getAuthenticatedUsername
 } = require('./lib/auth');
@@ -792,11 +795,13 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && url.pathname === '/api/auth/status') {
-      const user = getAuthenticatedUser(req);
+      const user = isGuestMode()
+        ? ensureGuestSession(req, res)
+        : getAuthenticatedUser(req);
       sendJson(res, 200, {
-        protected: true,
+        protected: !isGuestMode(),
         authenticated: Boolean(user),
-        loginMode: 'users',
+        loginMode: isGuestMode() ? 'guest' : 'users',
         setupRequired: !isAuthConfigured(),
         user
       });
@@ -804,19 +809,28 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && url.pathname === '/api/auth/login') {
+      if (isGuestMode()) {
+        sendJson(res, 410, { error: 'O login foi desativado. O acesso agora é automático.' });
+        return;
+      }
       if (!authLimiter.check(req, res)) return;
       await handleLogin(req, res);
       return;
     }
 
     if (req.method === 'POST' && url.pathname === '/api/auth/register') {
+      if (isGuestMode()) {
+        sendJson(res, 410, { error: 'O cadastro foi desativado. O acesso agora é automático.' });
+        return;
+      }
       if (!authLimiter.check(req, res)) return;
       await handleRegistration(req, res);
       return;
     }
 
     if (req.method === 'POST' && url.pathname === '/api/auth/logout') {
-      clearAuthCookie(req, res);
+      if (isGuestMode()) clearGuestCookie(req, res);
+      else clearAuthCookie(req, res);
       sendJson(res, 200, { ok: true });
       return;
     }
@@ -1213,7 +1227,7 @@ const server = http.createServer(async (req, res) => {
 async function startApplication() {
   await persistentStore.init();
   await ensureBootstrapAdmin();
-  if (!String(process.env.SESSION_SECRET || '').trim()) {
+  if (!isGuestMode() && !String(process.env.SESSION_SECRET || '').trim()) {
     logger.warn('Login bloqueado: configure SESSION_SECRET para liberar a Alya.');
   }
   await discordManager.init().catch((error) => logger.error('Discord init error:', error));
@@ -1297,6 +1311,10 @@ function serveStatic(requestPath, res) {
 }
 
 function requireAuth(req, res) {
+  if (isGuestMode()) {
+    ensureGuestSession(req, res);
+    return true;
+  }
   if (isAuthenticated(req)) return true;
   sendJson(res, 401, { error: 'Autenticação necessária.' });
   return false;
@@ -1310,6 +1328,10 @@ function requireAdmin(req, res) {
 }
 
 function requireAuthPage(req, res) {
+  if (isGuestMode()) {
+    ensureGuestSession(req, res);
+    return true;
+  }
   if (isAuthenticated(req)) return true;
   res.writeHead(302, { Location: '/aly', 'Cache-Control': 'no-store' });
   res.end();
@@ -1337,8 +1359,7 @@ function isAdminRoute(pathname) {
     '/api/notifications',
     '/api/plugins',
     '/api/whatsapp/',
-    '/api/discord/',
-    '/api/ai-status'
+    '/api/discord/'
   ].some((prefix) => pathname === prefix || pathname.startsWith(prefix));
 }
 

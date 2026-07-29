@@ -107,6 +107,7 @@ const conversationsKey = 'nova-conversations';
 
 let currentSessionUsername = '';
 let currentSessionRole = '';
+let currentSessionGuest = false;
 let history = [];
 let settings = loadSettings();
 let conversations = loadConversations();
@@ -178,6 +179,8 @@ function scopedStorageKey(key) {
 function activateSession(user) {
   currentSessionUsername = String(user?.username || '').toLowerCase();
   currentSessionRole = user?.role === 'admin' ? 'admin' : 'user';
+  const isGuest = user?.guest === true;
+  currentSessionGuest = isGuest;
   settings = loadSettings();
   conversations = loadConversations();
   currentConversationId = conversations[0]?.id || null;
@@ -186,14 +189,17 @@ function activateSession(user) {
   if (personalitySelect) personalitySelect.value = settings.personality;
   if (modeSelect) modeSelect.value = settings.mode;
   if (memoryInput) memoryInput.value = settings.memory;
-  if (profileName) profileName.textContent = currentSessionUsername;
-  if (profileRole) profileRole.textContent = currentSessionRole === 'admin' ? 'Administrador' : 'Conta Privada';
+  if (profileName) profileName.textContent = isGuest ? 'Visitante' : currentSessionUsername;
+  if (profileRole) profileRole.textContent = currentSessionRole === 'admin'
+    ? 'Administrador'
+    : isGuest ? 'Visitante' : 'Conta Privada';
   if (welcomeUserName) welcomeUserName.textContent = `${getUserName()}.`;
   if (settingsUserName) settingsUserName.value = getUserName();
   const isAdmin = currentSessionRole === 'admin';
   [systemButton, codeAlyaButton, computerButton, publicLinkBanner].forEach((element) => {
     if (element) element.hidden = !isAdmin;
   });
+  if (logoutButton) logoutButton.hidden = isGuest;
 }
 
 async function checkAuthentication() {
@@ -203,7 +209,7 @@ async function checkAuthentication() {
       credentials: 'include'
     });
     const data = await response.json();
-    authMode = 'users';
+    authMode = data.loginMode || 'guest';
     if (!data.authenticated) {
       showAuthModal(data.setupRequired ? 'O administrador ainda precisa configurar a primeira conta.' : '');
       return false;
@@ -212,7 +218,8 @@ async function checkAuthentication() {
     if (authModal) authModal.hidden = true;
     return true;
   } catch {
-    showAuthModal('Não consegui verificar o acesso. Tente novamente.');
+    if (authModal) authModal.hidden = true;
+    showToast('Não consegui conectar agora. Atualize a página em alguns segundos.', 'error');
     return false;
   }
 }
@@ -797,7 +804,9 @@ function setWelcomeEnabled(enabled) {
 
 function getUserName() {
   try {
-    return localStorage.getItem(scopedStorageKey(usernameKey)) || currentSessionUsername || 'Pedro';
+    return localStorage.getItem(scopedStorageKey(usernameKey)) ||
+      (currentSessionGuest ? 'Visitante' : currentSessionUsername) ||
+      'Pedro';
   } catch {
     return 'Pedro';
   }

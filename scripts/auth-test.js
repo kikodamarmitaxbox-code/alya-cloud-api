@@ -6,6 +6,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 process.env.SESSION_SECRET = crypto.randomBytes(48).toString('hex');
+process.env.AUTH_REQUIRED = 'true';
 process.env.ALYA_DEVICE_SECRET = crypto.randomBytes(40).toString('base64url');
 process.env.DATABASE_URL = '';
 process.env.DISCORD_ENABLED = 'false';
