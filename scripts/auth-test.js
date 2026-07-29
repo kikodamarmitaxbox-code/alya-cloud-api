@@ -6,6 +6,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 process.env.SESSION_SECRET = crypto.randomBytes(48).toString('hex');
+process.env.ALYA_DEVICE_SECRET = crypto.randomBytes(40).toString('base64url');
 process.env.DATABASE_URL = '';
 process.env.DISCORD_ENABLED = 'false';
 process.env.DISABLE_TUNNEL = 'true';
@@ -145,6 +146,14 @@ async function main() {
 
     const health = await request(baseUrl, '/health');
     assert(health.status === 200, '/health deveria permanecer público.');
+    const blockedDevice = await request(baseUrl, '/api/device/tasks?deviceId=teste', {
+      headers: { Authorization: 'Bearer segredo-errado' }
+    });
+    const allowedDevice = await request(baseUrl, '/api/device/tasks?deviceId=teste', {
+      headers: { Authorization: `Bearer ${process.env.ALYA_DEVICE_SECRET}` }
+    });
+    assert(blockedDevice.status === 401, 'A ponte local aceitou um segredo incorreto.');
+    assert(allowedDevice.status === 200, 'A ponte local recusou o segredo correto.');
     const blocked = await request(baseUrl, '/api/history/list');
     assert(blocked.status === 401, 'Rota privada aceitou acesso sem login.');
     const blockedCodePage = await request(baseUrl, '/code-alya.html');

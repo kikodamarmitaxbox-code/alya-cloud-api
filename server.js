@@ -43,6 +43,7 @@ const {
 const userFiles = require('./lib/userFiles');
 const notifications = require('./lib/notifications');
 const computerControl = require('./lib/computerControl');
+const deviceBridge = require('./lib/deviceBridge');
 const persistentStore = require('./lib/persistentStore');
 const metrics = require('./lib/metrics');
 const codeAgent = require('./lib/codeAgent');
@@ -411,12 +412,62 @@ const server = http.createServer(async (req, res) => {
       '/api/auth/status',
       '/api/auth/login',
       '/api/auth/register',
-      '/api/auth/logout'
+      '/api/auth/logout',
+      '/api/device/tasks',
+      '/api/device/result'
     ]);
 
     if (url.pathname.startsWith('/api/') && !publicRoutes.has(url.pathname)) {
       if (!requireAuth(req, res)) return;
       if (isAdminRoute(url.pathname) && !requireAdmin(req, res)) return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/device/tasks') {
+      if (!deviceBridge.authenticateDevice(req)) {
+        sendJson(res, 401, { error: 'Dispositivo não autorizado.' });
+        return;
+      }
+      const task = deviceBridge.claimNextTask(url.searchParams.get('deviceId'));
+      sendJson(res, 200, { ok: true, task });
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/device/result') {
+      if (!deviceBridge.authenticateDevice(req)) {
+        sendJson(res, 401, { error: 'Dispositivo não autorizado.' });
+        return;
+      }
+      const body = await readJsonBody(req, 12 * 1024 * 1024);
+      const task = deviceBridge.getClaimedTask(body.taskId, body.deviceId);
+      if (!task) {
+        sendJson(res, 404, { error: 'Pedido de captura inválido ou expirado.' });
+        return;
+      }
+      if (!body.ok) {
+        deviceBridge.completeTask(task.id, body.deviceId, false, body.error);
+        logger.warn('Captura local falhou.', { taskId: task.id, deviceId: task.deviceId });
+        sendJson(res, 200, { ok: true, message: 'Falha registrada sem enviar imagem.' });
+        return;
+      }
+      const image = Buffer.from(String(body.image || ''), 'base64');
+      const isPng = image.length >= 8 && image.subarray(0, 8).equals(
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+      );
+      if (!isPng || image.length > 8 * 1024 * 1024) {
+        deviceBridge.completeTask(task.id, body.deviceId, false, 'Imagem inválida.');
+        sendJson(res, 400, { error: 'A captura recebida é inválida.' });
+        return;
+      }
+      try {
+        await discordManager.sendScreenshot(task.destination, image, task.requestedBy);
+        deviceBridge.completeTask(task.id, body.deviceId, true);
+        sendJson(res, 200, { ok: true, message: `Captura enviada ao Discord “${task.destination}”.` });
+      } catch (error) {
+        deviceBridge.completeTask(task.id, body.deviceId, false, error.message);
+        logger.error('Não foi possível enviar a captura ao Discord:', error);
+        sendJson(res, 502, { error: 'A captura foi feita, mas o Discord não aceitou o envio.' });
+      }
+      return;
     }
 
     if (req.method === 'POST' && url.pathname === '/api/chat') {
@@ -674,15 +725,44 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && url.pathname === '/api/computer/propose') {
-      if (!computerControl.localOnly(req)) return sendJson(res, 403, { error: 'O controle do computador só funciona neste computador.' });
       const body = await readJsonBody(req);
-      return sendJson(res, 200, computerControl.createProposal(body.request));
+      const localRequest = computerControl.localOnly(req);
+      return sendJson(res, 200, computerControl.createProposal(body.request, {
+        screenshotOnly: !localRequest
+      }));
     }
 
     if (req.method === 'POST' && url.pathname === '/api/computer/execute') {
-      if (!computerControl.localOnly(req)) return sendJson(res, 403, { error: 'O controle do computador só funciona neste computador.' });
       const body = await readJsonBody(req);
-      return sendJson(res, 200, computerControl.executeProposal(body.approvalId));
+      const localRequest = computerControl.localOnly(req);
+      const result = computerControl.executeProposal(body.approvalId, {
+        allowLocalActions: localRequest
+      });
+      if (!result.ok || result.action !== 'screenshot') {
+        return sendJson(res, result.ok ? 200 : 400, result);
+      }
+      if (localRequest) {
+        try {
+          const image = await computerControl.captureScreenshot();
+          await discordManager.sendScreenshot(
+            result.destination,
+            image,
+            getAuthenticatedUsername(req) || 'administrador'
+          );
+          return sendJson(res, 200, {
+            ok: true,
+            message: `Captura enviada ao Discord “${result.destination}”.`
+          });
+        } catch (error) {
+          logger.error('Captura local ou envio ao Discord falhou:', error);
+          return sendJson(res, 400, { error: error.message || 'Não foi possível enviar a captura.' });
+        }
+      }
+      const queued = deviceBridge.createScreenshotTask(
+        result.destination,
+        getAuthenticatedUsername(req) || 'administrador'
+      );
+      return sendJson(res, queued.ok ? 202 : 400, queued);
     }
 
     if (req.method === 'GET' && url.pathname === '/aly') {

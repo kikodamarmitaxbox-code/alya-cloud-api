@@ -723,7 +723,12 @@ function appendComputerApproval(label, approvalId) {
 }
 
 async function tryComputerCommand(content) {
-  if (!/^(abra|abrir|abre)\b/i.test(content.trim())) return false;
+  const command = content.trim();
+  const opensSomething = /^(abra|abrir|abre)\b/i.test(command);
+  const requestsScreenshot =
+    /\b(?:print|screenshot|captura da tela|foto da tela)\b/i.test(command) &&
+    /\b(?:tira|tirar|tire|faça|fazer|capture|captura|mande|mandar|envie|enviar)\b/i.test(command);
+  if (!opensSomething && !requestsScreenshot) return false;
   try {
     const response = await fetch(`${apiBase}/api/computer/propose`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ request: content }) });
     const data = await response.json().catch(() => ({}));
