@@ -9,8 +9,11 @@ const {
   prepareConversation
 } = require('../lib/conversationContext');
 const {
+  askAssistant,
   assistantIdentity,
+  getInstantReply,
   getProviderOrder,
+  getRequestTimeout,
   runProviderChain,
   safeProviderMessage
 } = require('../lib/chat');
@@ -33,6 +36,19 @@ async function testNormalConversation() {
   const prompt = assistantIdentity({ taskIntent: 'conversation', taskComplexity: 'standard' });
   assert.match(prompt, /português do Brasil/i);
   assert.match(prompt, /Nunca invente fatos/i);
+  assert.strictEqual(
+    getInstantReply([{ role: 'user', content: 'oi' }], { taskIntent: 'conversation' }),
+    'Oi! Tô aqui. O que você quer fazer?'
+  );
+  assert.ok(
+    getRequestTimeout({ taskComplexity: 'standard' }) <
+    getRequestTimeout({ taskComplexity: 'complex' }),
+    'Tarefas simples deveriam abandonar um provedor travado mais rapidamente.'
+  );
+  const startedAt = Date.now();
+  const instant = await askAssistant([{ role: 'user', content: 'oi' }], {});
+  assert.strictEqual(instant, 'Oi! Tô aqui. O que você quer fazer?');
+  assert.ok(Date.now() - startedAt < 100, 'A saudação simples deveria responder sem esperar uma API externa.');
 }
 
 async function testLongConversation() {
@@ -48,7 +64,7 @@ async function testLongConversation() {
     userId: 'test_context',
     conversationId: 'long_chat'
   });
-  assert.ok(prepared.messages.length <= 10);
+  assert.ok(prepared.messages.length <= 6);
   assert.match(prepared.summary, /Orion/i);
   assert.ok(prepared.messages.some((message) => /Orion/i.test(message.content)));
   const deduplicated = normalizeMessages([
