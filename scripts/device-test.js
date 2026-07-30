@@ -70,6 +70,8 @@ async function main() {
   };
   assert.strictEqual(privateDiscord._isAllowed(ownerDm), true);
   assert.strictEqual(privateDiscord._isAllowed(otherDm), false);
+  assert.strictEqual(discord._isAllowed(ownerDm), true);
+  assert.strictEqual(discord._isAllowed(otherDm), false);
   assert.strictEqual(privateDiscord._shouldRespond(ownerDm, 'oi, tudo bem?'), true);
   assert.strictEqual(privateDiscord._shouldRespond(guildMessage, 'oi, tudo bem?'), false);
   assert.strictEqual(privateDiscord._shouldRespond(guildMessage, 'Alya, tudo bem?'), true);
