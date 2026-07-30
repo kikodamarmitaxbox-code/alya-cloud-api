@@ -450,12 +450,19 @@ function renderPlan(data) {
   }
   const actions = Array.isArray(data.actions) ? data.actions : [];
   const previews = new Map((data.preview || []).map((preview) => [preview.path, preview]));
-  const hasWrites = actions.some((action) => action.type === 'write');
+  const hasWrites = actions.some((action) => ['write', 'move', 'delete'].includes(action.type));
+  const hasDestructiveAction = actions.some((action) => ['move', 'delete'].includes(action.type));
   const hasImportantCommand = actions.some((action) => (
     action.type === 'command' &&
-    /^(?:npm\s+install|git\s+(?:commit|push))\b/i.test(action.command || '')
+    /^(?:npm\s+(?:install|ci)|git\s+(?:commit|push))\b/i.test(action.command || '')
   ));
   const actionsHtml = actions.map((action) => {
+    if (action.type === 'move') {
+      return `<div class="plan-action"><span>↪</span><b>${escapeHtml(action.from)}</b><span>→ ${escapeHtml(action.to)}</span></div>`;
+    }
+    if (action.type === 'delete') {
+      return `<div class="plan-action"><span>×</span><b>${escapeHtml(action.path)}</b><span>apagar com backup</span></div>`;
+    }
     if (action.type === 'write') {
       const preview = previews.get(action.path);
       const changeLabel = preview?.status === 'create'
@@ -479,7 +486,7 @@ function renderPlan(data) {
     ? `<div class="plan-card">
         <div class="plan-head"><strong>${hasWrites ? 'Revisão pronta' : 'Verificações prontas'}</strong><span>${escapeHtml(data.model)}</span></div>
         <div class="plan-actions">${actionsHtml}</div>
-        <button class="plan-apply" type="button" data-plan="${escapeHtml(data.planId)}" data-session="${escapeHtml(data.sessionId || '')}" data-has-writes="${hasWrites}" data-important-command="${hasImportantCommand}">
+        <button class="plan-apply" type="button" data-plan="${escapeHtml(data.planId)}" data-session="${escapeHtml(data.sessionId || '')}" data-has-writes="${hasWrites}" data-destructive="${hasDestructiveAction}" data-important-command="${hasImportantCommand}">
           ${hasWrites ? 'Aplicar com backup' : 'Executar verificações'}
         </button>
       </div>`
@@ -537,11 +544,14 @@ async function sendCodeRequest(message) {
 async function applyPlan(event) {
   const button = event.currentTarget;
   const hasWrites = button.dataset.hasWrites === 'true';
+  const hasDestructiveAction = button.dataset.destructive === 'true';
   const hasImportantCommand = button.dataset.importantCommand === 'true';
   if (
     (hasWrites || hasImportantCommand) &&
     !window.confirm(
-      hasImportantCommand
+      hasDestructiveAction
+        ? 'Este plano move ou apaga arquivos. Um backup será criado, mas revise tudo acima antes de confirmar.'
+        : hasImportantCommand
         ? 'Este plano instala pacotes ou envia alterações pelo Git. Revise os comandos acima e confirme para continuar.'
         : 'Aplicar estas mudanças? A Code Sofia criará um backup para você poder desfazer.'
     )
@@ -555,10 +565,11 @@ async function applyPlan(event) {
       method: 'POST',
       body: JSON.stringify({ planId: button.dataset.plan })
     }, appendTerminalProgress);
+    await loadWorkspace();
     for (const filePath of data.changedFiles || []) {
       if (state.openFiles.has(filePath)) {
         state.openFiles.delete(filePath);
-        await openFile(filePath);
+        if (state.workspace?.files?.includes(filePath)) await openFile(filePath);
       }
     }
     state.lastActionId = data.canUndo ? data.actionId : state.lastActionId;
@@ -571,7 +582,6 @@ async function applyPlan(event) {
     }${data.canUndo ? ' Você pode desfazer pelo botão ↶ no topo do chat.' : ''}`;
     addMessage('assistant', resultMessage);
     rememberMessage('assistant', resultMessage);
-    await loadWorkspace();
     showToast(hasWrites ? 'Mudanças aplicadas com backup automático.' : 'Verificações concluídas.');
     if (data.canContinue && state.autoMode && data.sessionId) {
       await continueSupervisedSession(data.sessionId);

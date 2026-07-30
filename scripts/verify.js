@@ -107,6 +107,17 @@ async function verifySafety() {
   if (recoveredPlan.summary !== 'Plano recuperado' || recoveredPlan.actions.length !== 1) {
     throw new Error('A Code Sofia não recuperou uma resposta com texto extra.');
   }
+  const oversizedPlan = codeAgent.parseModelPlan(JSON.stringify({
+    summary: 'Plano grande',
+    actions: Array.from({ length: 24 }, (_, index) => ({
+      type: 'write',
+      path: `arquivo-${index}.txt`,
+      content: String(index)
+    }))
+  }));
+  if (oversizedPlan.actions.length !== 16) {
+    throw new Error('O limite ampliado de ações da Code Sofia não está funcionando.');
+  }
 
   const testProjectName = `Verificação Sofia ${Date.now()}`;
   const createdProject = codeAgent.createProject(testProjectName).project;
@@ -134,6 +145,41 @@ async function verifySafety() {
     ) {
       throw new Error('A edição econômica por trechos não foi preparada corretamente.');
     }
+    const chainedPatches = codeAgent.normalizeModelActions([
+      {
+        type: 'patch',
+        path: 'README.md',
+        find: 'Projeto criado pela Code Sofia.',
+        replace: 'Projeto preparado pela Code Sofia.'
+      },
+      {
+        type: 'patch',
+        path: 'README.md',
+        find: 'Projeto preparado pela Code Sofia.',
+        replace: 'Projeto validado pela Code Sofia.'
+      }
+    ], createdProject.id);
+    if (
+      chainedPatches.length !== 1 ||
+      !chainedPatches[0].content.includes('Projeto validado pela Code Sofia.')
+    ) {
+      throw new Error('Alterações sequenciais no mesmo arquivo se sobrescreveram.');
+    }
+    fs.writeFileSync(path.join(testProjectRoot, 'mover.txt'), 'mover', 'utf8');
+    fs.writeFileSync(path.join(testProjectRoot, 'apagar.txt'), 'apagar', 'utf8');
+    const filesystemActions = codeAgent.normalizeModelActions([
+      { type: 'move', from: 'mover.txt', to: 'movido.txt' },
+      { type: 'delete', path: 'apagar.txt' }
+    ], createdProject.id);
+    if (
+      filesystemActions.length !== 2 ||
+      filesystemActions[0].type !== 'move' ||
+      filesystemActions[1].type !== 'delete'
+    ) {
+      throw new Error('Mover ou apagar arquivo não foi preparado com segurança.');
+    }
+    fs.unlinkSync(path.join(testProjectRoot, 'mover.txt'));
+    fs.unlinkSync(path.join(testProjectRoot, 'apagar.txt'));
     let crossProjectBlocked = false;
     try {
       codeAgent.readProjectFile(`projects/${createdProject.id}/README.md`, 50000, 'main');
