@@ -55,6 +55,21 @@ async function testNormalConversation() {
     getInstantReply([{ role: 'user', content: 'oi' }], { taskIntent: 'conversation' }),
     'Oi! Tô aqui. O que você quer fazer?'
   );
+  assert.strictEqual(
+    getInstantReply([{ role: 'user', content: 'oi Sofia' }], {
+      taskIntent: 'conversation',
+      isDiscord: true
+    }),
+    'Fala, porra KKKKK. Qual é a boa?'
+  );
+  assert.strictEqual(
+    getInstantReply([{ role: 'user', content: 'oi Sofia' }], {
+      taskIntent: 'conversation',
+      isDiscord: true,
+      discordNoJokes: true
+    }),
+    'Oi! Tô aqui. O que você quer fazer?'
+  );
   assert.ok(
     getRequestTimeout({ taskComplexity: 'standard' }) <
     getRequestTimeout({ taskComplexity: 'complex' }),
@@ -90,8 +105,27 @@ async function testPromptAdaptation() {
     rivalMode: true
   });
   assert.match(discordPrompt, /No Discord/i);
+  assert.match(discordPrompt, /\[DISCORD: MODO ZOEIRA PADRÃO\]/);
+  assert.match(discordPrompt, /KKKKK/);
+  assert.match(discordPrompt, /continue ajudando de verdade/i);
   assert.match(discordPrompt, /\[CONFLITO NO DISCORD\]/);
-  assert.match(discordPrompt, /sem ofensas/i);
+  assert.match(discordPrompt, /sem ameaças/i);
+
+  const respectfulDiscordPrompt = assistantIdentity({
+    taskIntent: 'conversation',
+    isDiscord: true,
+    discordNoJokes: true
+  });
+  assert.match(respectfulDiscordPrompt, /\[DISCORD: SEM ZOEIRA PARA ESTA PESSOA\]/);
+  assert.match(respectfulDiscordPrompt, /Não use zoeira/i);
+
+  const seriousDiscordPrompt = assistantIdentity({
+    taskIntent: 'conversation',
+    isDiscord: true,
+    discordSerious: true
+  });
+  assert.match(seriousDiscordPrompt, /\[DISCORD: MODO SÉRIO TEMPORÁRIO\]/);
+  assert.match(seriousDiscordPrompt, /Suspenda zoeira/i);
 }
 
 async function testSelectiveQualityReview() {

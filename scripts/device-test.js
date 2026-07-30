@@ -75,6 +75,12 @@ async function main() {
   assert.strictEqual(privateDiscord._shouldRespond(ownerDm, 'oi, tudo bem?'), true);
   assert.strictEqual(privateDiscord._shouldRespond(guildMessage, 'oi, tudo bem?'), false);
   assert.strictEqual(privateDiscord._shouldRespond(guildMessage, 'Sofia, tudo bem?'), true);
+  assert.strictEqual(privateDiscord._discordToneSettings(ownerDm, 'sem zoeira').discordNoJokes, true);
+  assert.strictEqual(privateDiscord._discordToneSettings(ownerDm, 'agora me ajuda').discordNoJokes, true);
+  assert.strictEqual(privateDiscord._discordToneSettings(ownerDm, 'pode voltar a zoar').discordNoJokes, false);
+  const seriousTone = privateDiscord._discordToneSettings(ownerDm, 'estou triste e preciso desabafar');
+  assert.strictEqual(seriousTone.discordSerious, true);
+  assert.strictEqual(seriousTone.discordNoJokes, true);
 
   process.stdout.write('Ponte local verificada: aprovação, isolamento, segredo e destinos Discord seguros.\n');
 }
