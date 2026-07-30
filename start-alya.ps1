@@ -2,8 +2,17 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $projectRoot
 
+trap {
+  Write-Host ''
+  Write-Host 'A Sofia encontrou um erro ao iniciar:' -ForegroundColor Red
+  Write-Host $_.Exception.Message
+  Write-Host ''
+  [void](Read-Host 'Pressione Enter para fechar esta janela')
+  exit 1
+}
+
 Write-Host '========================================'
-Write-Host '          Iniciando Alya...'
+Write-Host '          Iniciando Sofia...'
 Write-Host '========================================'
 Write-Host ''
 
@@ -38,45 +47,36 @@ function Get-PortProcess {
   return $null
 }
 
-function Stop-PortProcess {
-  param([int]$Port)
-  $connections = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue | Where-Object State -eq 'Listen'
-  if (-not $connections) {
-    return $false
-  }
-  $processIds = $connections | Select-Object -ExpandProperty OwningProcess -Unique
-  foreach ($processId in $processIds) {
-    $proc = Get-Process -Id $processId -ErrorAction SilentlyContinue
-    if ($proc) {
-      Write-Host "Finalizando processo antigo: $($proc.ProcessName) (PID $processId) na porta $Port"
-      Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
-    }
-  }
-  Start-Sleep -Seconds 2
-  $remaining = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue | Where-Object State -eq 'Listen'
-  return (-not $remaining)
-}
-
 $port = 3000
 $existingProcess = Get-PortProcess -Port $port
 
 if ($existingProcess) {
-  Write-Host "Porta $port em uso por: $($existingProcess.ProcessName) (PID $($existingProcess.Id))"
-  $freed = Stop-PortProcess -Port $port
-  if (-not $freed) {
-    Write-Host ''
-    Write-Host 'Erro: Nao foi possivel liberar a porta 3000.'
-    Write-Host 'Feche manualmente o programa que esta usando a porta e tente novamente.'
-    pause
-    exit 1
+  try {
+    $health = Invoke-RestMethod -Uri 'http://localhost:3000/health' -TimeoutSec 2
+    if ($health.ok -and $health.name -eq 'Sofia') {
+      Write-Host 'A Sofia ja esta ligada.' -ForegroundColor Green
+      Write-Host "Servidor: $($existingProcess.ProcessName) (PID $($existingProcess.Id))"
+      Write-Host ''
+      Start-Process 'http://localhost:3000/aly'
+      Write-Host 'Esta janela ficara aberta ate voce fecha-la.'
+      [void](Read-Host 'Pressione Enter somente se quiser fechar esta janela')
+      exit 0
+    }
+  } catch {
+    # A porta pertence a outro programa; a mensagem detalhada aparece abaixo.
   }
-  Write-Host "Porta $port liberada com sucesso."
+
   Write-Host ''
+  Write-Host "A porta $port esta sendo usada por outro programa: $($existingProcess.ProcessName) (PID $($existingProcess.Id))." -ForegroundColor Red
+  Write-Host 'A Sofia nao encerrou esse programa por seguranca.'
+  Write-Host 'Feche o programa manualmente e tente outra vez.'
+  [void](Read-Host 'Pressione Enter para fechar esta janela')
+  exit 1
 }
 
 Write-Host 'Iniciando servidor Node.js...'
 $env:PORT = '3000'
-$server = Start-Process -FilePath 'node' -ArgumentList 'server.js' -PassThru -WorkingDirectory $projectRoot -WindowStyle Minimized
+$server = Start-Process -FilePath 'node' -ArgumentList 'server.js' -PassThru -WorkingDirectory $projectRoot -NoNewWindow
 
 Write-Host ''
 Write-Host 'Aguardando servidor...'
@@ -104,7 +104,7 @@ if (-not $serverReady) {
   if ($server -and -not $server.HasExited) {
     Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
   }
-  pause
+  [void](Read-Host 'Pressione Enter para fechar esta janela')
   exit 1
 }
 
@@ -113,7 +113,7 @@ Write-Host '========================================'
 Write-Host '🟢 Servidor iniciado com sucesso'
 Write-Host '========================================'
 Write-Host ''
-Write-Host '🌐 Alya disponivel em http://localhost:3000/aly'
+Write-Host 'Sofia disponivel em http://localhost:3000/aly'
 Write-Host ''
 
 try {
@@ -125,7 +125,7 @@ try {
   Write-Host ''
   Write-Host 'Compartilhe esse link com seus amigos!'
   Write-Host ''
-  Write-Host 'Pressione Ctrl+C para encerrar.'
+  Write-Host 'A Sofia continuara ligada ate voce fechar esta janela ou pressionar Ctrl+C.'
   Write-Host ''
 
   $opened = $false
@@ -153,6 +153,13 @@ Write-Host ''
 try {
   Wait-Process -Id $server.Id -ErrorAction SilentlyContinue
 } catch {
-  Write-Host ''
-  Write-Host 'Servidor encerrado.'
+  # Fechar a janela ou pressionar Ctrl+C encerra o processo compartilhado.
 }
+
+Write-Host ''
+if ($server.HasExited) {
+  Write-Host "A Sofia foi encerrada (codigo $($server.ExitCode))." -ForegroundColor Yellow
+} else {
+  Write-Host 'A Sofia foi encerrada.' -ForegroundColor Yellow
+}
+[void](Read-Host 'Pressione Enter para fechar esta janela')
