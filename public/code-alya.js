@@ -130,7 +130,7 @@ async function streamApi(url, options = {}, onProgress = () => {}) {
     const dataLine = frame.split(/\r?\n/).find((line) => line.startsWith('data:'));
     if (!dataLine) return;
     const event = JSON.parse(dataLine.slice(5).trim());
-    if (event.type === 'progress') onProgress(event.message);
+    if (event.type === 'progress') onProgress(event.message, event.kind || 'progress');
     else if (event.type === 'result') result = event.data;
     else if (event.type === 'error') throw new Error(event.error || 'A Code Alya encontrou um problema.');
   };
@@ -495,6 +495,8 @@ async function sendCodeRequest(message) {
   state.busy = true;
   sendCodeButton.disabled = true;
   codePromptInput.value = '';
+  ensureTerminalVisible();
+  appendTerminal('── Analisando novo pedido ──', 'terminal-system');
   rememberMessage('user', clean);
   addMessage('user', clean);
   const thinking = addThinking();
@@ -514,6 +516,7 @@ async function sendCodeRequest(message) {
     }, (message) => {
       clearTimeout(wakeTimer);
       updateThinking(thinking, message);
+      appendTerminal(`[Alya] ${message}`, 'terminal-system');
     });
     clearTimeout(wakeTimer);
     thinking.remove();
@@ -545,15 +548,13 @@ async function applyPlan(event) {
   ) return;
   button.disabled = true;
   button.textContent = hasWrites ? 'Aplicando e testando...' : 'Executando verificações...';
+  ensureTerminalVisible();
+  appendTerminal('── Iniciando plano aprovado ──', 'terminal-system');
   try {
-    const data = await api('/api/code-alya/apply', {
+    const data = await streamApi('/api/code-alya/apply-stream', {
       method: 'POST',
       body: JSON.stringify({ planId: button.dataset.plan })
-    });
-    for (const result of data.commandResults || []) {
-      appendTerminal(`$ ${result.command}`, 'terminal-command');
-      appendTerminal(result.output || (result.ok ? 'Concluído.' : 'Falhou.'), result.ok ? '' : 'terminal-error');
-    }
+    }, appendTerminalProgress);
     for (const filePath of data.changedFiles || []) {
       if (state.openFiles.has(filePath)) {
         state.openFiles.delete(filePath);
@@ -576,6 +577,7 @@ async function applyPlan(event) {
       await continueSupervisedSession(data.sessionId);
     }
   } catch (error) {
+    appendTerminal(error.message, 'terminal-error');
     button.disabled = false;
     button.textContent = hasWrites ? 'Tentar aplicar novamente' : 'Tentar verificar novamente';
     showToast(error.message, 'error');
@@ -683,18 +685,34 @@ function appendTerminal(text, className = '') {
   terminalOutput.scrollTop = terminalOutput.scrollHeight;
 }
 
+function ensureTerminalVisible() {
+  state.terminalOpen = true;
+  terminalPanel.classList.remove('collapsed');
+}
+
+function appendTerminalProgress(message, kind = 'output') {
+  const className = kind === 'command'
+    ? 'terminal-command'
+    : kind === 'error'
+      ? 'terminal-error'
+      : kind === 'stage' || kind === 'progress'
+        ? 'terminal-system'
+        : '';
+  appendTerminal(message, className);
+}
+
 async function runTerminalCommand(command) {
   const clean = String(command || '').trim();
   if (!clean) return;
-  appendTerminal(`alya ❯ ${clean}`, 'terminal-command');
+  ensureTerminalVisible();
   terminalInput.value = '';
   terminalInput.disabled = true;
   try {
-    const data = await api('/api/code-alya/command', {
+    const data = await streamApi('/api/code-alya/command-stream', {
       method: 'POST',
       body: JSON.stringify({ command: clean, projectId: state.projectId })
-    });
-    appendTerminal(data.output || 'Concluído.');
+    }, appendTerminalProgress);
+    if (!data.output) appendTerminal(data.ok ? '✓ Concluído sem saída.' : '✗ O comando falhou.');
   } catch (error) {
     appendTerminal(error.message, 'terminal-error');
   } finally {

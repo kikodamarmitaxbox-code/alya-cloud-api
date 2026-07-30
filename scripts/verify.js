@@ -48,7 +48,11 @@ function verifyCodeAlyaInterface() {
   }
   if (
     !client.includes("streamApi('/api/code-alya/plan-stream'") ||
-    !server.includes("url.pathname === '/api/code-alya/plan-stream'")
+    !client.includes("streamApi('/api/code-alya/apply-stream'") ||
+    !client.includes("streamApi('/api/code-alya/command-stream'") ||
+    !server.includes("url.pathname === '/api/code-alya/plan-stream'") ||
+    !server.includes("url.pathname === '/api/code-alya/apply-stream'") ||
+    !server.includes("url.pathname === '/api/code-alya/command-stream'")
   ) {
     throw new Error('O progresso em tempo real da Code Alya não está conectado.');
   }
@@ -146,8 +150,19 @@ async function verifySafety() {
     fs.rmdirSync(testProjectRoot);
   }
 
-  const command = await codeAgent.runSafeCommand('node --check server.js');
+  const liveProgress = [];
+  const command = await codeAgent.runSafeCommand(
+    'node --check server.js',
+    'main',
+    (message, kind) => liveProgress.push({ message, kind })
+  );
   if (!command.ok) throw new Error(`A validação do servidor falhou: ${command.output}`);
+  if (
+    !liveProgress.some((entry) => entry.kind === 'command') ||
+    !liveProgress.some((entry) => entry.kind === 'success')
+  ) {
+    throw new Error('O terminal não recebeu o progresso do comando em tempo real.');
+  }
 
   let protectedCommandBlocked = false;
   try {

@@ -654,6 +654,17 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === 'POST' && url.pathname === '/api/code-alya/apply-stream') {
+      if (!apiLimiter.check(req, res)) return;
+      if (!requireAuth(req, res)) return;
+      const body = await readJsonBody(req);
+      await sendCodeAgentStream(
+        res,
+        (onProgress) => codeAgent.applyCodePlan(body.planId, onProgress)
+      );
+      return;
+    }
+
     if (req.method === 'POST' && url.pathname === '/api/code-alya/undo') {
       if (!apiLimiter.check(req, res)) return;
       if (!requireAuth(req, res)) return;
@@ -670,6 +681,17 @@ const server = http.createServer(async (req, res) => {
         body.command,
         body.projectId
       ));
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/code-alya/command-stream') {
+      if (!apiLimiter.check(req, res)) return;
+      if (!requireAuth(req, res)) return;
+      const body = await readJsonBody(req);
+      await sendCodeAgentStream(
+        res,
+        (onProgress) => codeAgent.runSafeCommand(body.command, body.projectId, onProgress)
+      );
       return;
     }
 
@@ -1385,8 +1407,12 @@ async function sendCodeAgentStream(res, operation) {
     res.write(`data: ${JSON.stringify(payload)}\n\n`);
   };
   try {
-    const result = await operation((message) => {
-      sendEvent({ type: 'progress', message: String(message || '').slice(0, 180) });
+    const result = await operation((message, kind = 'progress') => {
+      sendEvent({
+        type: 'progress',
+        kind: String(kind || 'progress').slice(0, 24),
+        message: String(message || '').slice(0, 4000)
+      });
     });
     sendEvent({ type: 'result', data: result });
   } catch (error) {
