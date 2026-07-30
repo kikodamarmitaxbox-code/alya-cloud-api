@@ -52,7 +52,8 @@ $existingProcess = Get-PortProcess -Port $port
 
 if ($existingProcess) {
   try {
-    $health = Invoke-RestMethod -Uri 'http://localhost:3000/health' -TimeoutSec 2
+    $healthJson = & curl.exe --silent --max-time 2 'http://127.0.0.1:3000/health'
+    $health = $healthJson | ConvertFrom-Json
     if ($health.ok -and $health.name -eq 'Sofia') {
       Write-Host 'A Sofia ja esta ligada.' -ForegroundColor Green
       Write-Host "Servidor: $($existingProcess.ProcessName) (PID $($existingProcess.Id))"
@@ -74,6 +75,9 @@ if ($existingProcess) {
   exit 1
 }
 
+$browserOpened = $false
+
+while ($true) {
 Write-Host 'Iniciando servidor Node.js...'
 $env:PORT = '3000'
 $server = Start-Process -FilePath 'node' -ArgumentList 'server.js' -PassThru -WorkingDirectory $projectRoot -NoNewWindow
@@ -86,8 +90,9 @@ $retry = 0
 $serverReady = $false
 while ($retry -lt $maxRetries) {
   try {
-    $response = Invoke-WebRequest -Uri 'http://localhost:3000/api/aly-link' -UseBasicParsing -TimeoutSec 2
-    if ($response.StatusCode -eq 200) {
+    $healthJson = & curl.exe --silent --max-time 2 'http://127.0.0.1:3000/health'
+    $health = $healthJson | ConvertFrom-Json
+    if ($health.ok -and $health.name -eq 'Sofia') {
       $serverReady = $true
       break
     }
@@ -100,12 +105,12 @@ while ($retry -lt $maxRetries) {
 if (-not $serverReady) {
   Write-Host ''
   Write-Host 'Erro: Nao foi possivel iniciar o servidor.'
-  Write-Host 'Verifique se a porta 3000 esta disponivel.'
+  Write-Host 'A Sofia tentara iniciar novamente em 5 segundos.'
   if ($server -and -not $server.HasExited) {
     Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
   }
-  [void](Read-Host 'Pressione Enter para fechar esta janela')
-  exit 1
+  Start-Sleep -Seconds 5
+  continue
 }
 
 Write-Host ''
@@ -116,18 +121,15 @@ Write-Host ''
 Write-Host 'Sofia disponivel em http://localhost:3000/aly'
 Write-Host ''
 
-try {
-  $response = Invoke-WebRequest -Uri 'http://localhost:3000/api/aly-link' -UseBasicParsing -TimeoutSec 2
-  $data = $response.Content | ConvertFrom-Json
-  $chatUrl = $data.chatUrl
-  Write-Host 'Link publico: ' -NoNewline
-  Write-Host $chatUrl -ForegroundColor Cyan
-  Write-Host ''
-  Write-Host 'Compartilhe esse link com seus amigos!'
-  Write-Host ''
-  Write-Host 'A Sofia continuara ligada ate voce fechar esta janela ou pressionar Ctrl+C.'
-  Write-Host ''
+$chatUrl = 'http://localhost:3000/aly'
+$publicChatUrl = 'https://alya-gnz7.onrender.com/aly'
+Write-Host 'Link publico permanente: ' -NoNewline
+Write-Host $publicChatUrl -ForegroundColor Cyan
+Write-Host ''
+Write-Host 'A Sofia continuara ligada ate voce fechar esta janela ou pressionar Ctrl+C.'
+Write-Host ''
 
+if (-not $browserOpened) {
   $opened = $false
   $bravePaths = @(
     "$env:PROGRAMFILES\BraveSoftware\Brave-Browser\Application\brave.exe",
@@ -144,9 +146,7 @@ try {
   if (-not $opened) {
     Start-Process $chatUrl
   }
-} catch {
-  Write-Host 'Nao foi possivel obter o link publico automaticamente.'
-  Write-Host 'Acesse manualmente: http://localhost:3000/aly'
+  $browserOpened = $true
 }
 
 Write-Host ''
@@ -162,4 +162,6 @@ if ($server.HasExited) {
 } else {
   Write-Host 'A Sofia foi encerrada.' -ForegroundColor Yellow
 }
-[void](Read-Host 'Pressione Enter para fechar esta janela')
+Write-Host 'Reiniciando automaticamente em 5 segundos. Feche esta janela para desligar de vez.'
+Start-Sleep -Seconds 5
+}
