@@ -16,14 +16,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
-  <style>
-    .public-link-label { font-weight: 600; color: var(--text-secondary); }
-    .public-link-text { flex: 1; font-family: var(--font-mono); color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .public-link-copy, .public-link-restart {
-      background: rgba(255, 255, 255, 0.08); border: none; color: #fff; border-radius: 6px; padding: 4px 12px; cursor: pointer; transition: 0.2s;
-    }
-    .public-link-copy:hover, .public-link-restart:hover { background: rgba(255, 255, 255, 0.16); }
-  </style>
 </head>
 <body class="app-shell">
 
@@ -96,14 +88,6 @@
 
   <!-- Main Panel -->
   <section class="main-panel" aria-label="Area principal">
-    <div id="publicLinkBanner" class="public-link-banner" hidden>
-      <span id="publicLinkStatus" class="public-link-status"></span>
-      <span class="public-link-label">Link público:</span>
-      <span id="publicLinkText" class="public-link-text"></span>
-      <button id="copyPublicLink" class="public-link-copy" type="button" title="Copiar">Copiar</button>
-      <button id="restartTunnel" class="public-link-restart" type="button" title="Reiniciar">Reiniciar</button>
-    </div>
-
     <div id="loadingScreen" class="loading-screen">
       <div class="loading-inner">
         <span class="brand-mark">✦</span>
@@ -127,7 +111,6 @@
         <button id="searchButton" class="icon-btn header-search-button" type="button" title="Buscar na conversa" aria-label="Buscar na conversa">⌕</button>
         <button id="themeButton" class="icon-btn theme-button" type="button" title="Alterar tema" aria-label="Alterar tema">☼</button>
         <button id="computerButton" class="share-btn" type="button" title="Controle seguro do computador">⌘ Computador</button>
-        <button id="shareLinkButton" class="share-btn" type="button" title="Compartilhar"><span>↗</span> Compartilhar</button>
         <div class="header-avatar alya-avatar" title="Sofia"><img src="images/alya-avatar.png" alt="Sofia" /><div class="profile-online-dot"></div></div>
       </div>
     </header>

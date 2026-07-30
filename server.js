@@ -2,7 +2,6 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { spawn } = require('child_process');
 
 const logger = require('./lib/logger');
 const {
@@ -56,126 +55,8 @@ const root = __dirname;
 const publicDir = path.join(root, 'public');
 const port = Number(process.env.PORT || 3000);
 
-let publicTunnelUrl = '';
-let cloudflaredProcess = null;
-let tunnelStartAttempts = 0;
-const TUNNEL_MAX_ATTEMPTS = 10;
-let tunnelReconnectTimer = null;
-
-function getCloudflaredPath() {
-  const platform = process.platform;
-  if (platform === 'win32') {
-    return path.join(root, 'tools', 'cloudflared.exe');
-  }
-  return path.join(root, 'tools', 'cloudflared');
-}
-
-function ensureCloudflaredExists() {
-  const tunnelPath = getCloudflaredPath();
-  if (fs.existsSync(tunnelPath)) {
-    return tunnelPath;
-  }
-
-  logger.warn('cloudflared not found at', tunnelPath);
-  return null;
-}
-
-function startCloudflareTunnel() {
-  if (publicTunnelUrl) {
-    logger.info('Cloudflare Tunnel already running at', publicTunnelUrl);
-    return;
-  }
-
-  const tunnelPath = ensureCloudflaredExists();
-  if (!tunnelPath) {
-    logger.warn('Cloudflare Tunnel skipped: cloudflared not available.');
-    return;
-  }
-
-  tunnelStartAttempts += 1;
-  if (tunnelStartAttempts > TUNNEL_MAX_ATTEMPTS) {
-    logger.warn('Cloudflare Tunnel max attempts reached.');
-    return;
-  }
-
-  logger.info('Starting Cloudflare Tunnel...');
-
-  const args = ['tunnel', '--url', `http://localhost:${port}`];
-  cloudflaredProcess = spawn(tunnelPath, args, {
-    stdio: ['ignore', 'pipe', 'pipe']
-  });
-
-  cloudflaredProcess.stdout.on('data', (data) => {
-    const text = data.toString();
-    const match = text.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
-    if (match && match[0] !== publicTunnelUrl) {
-      publicTunnelUrl = match[0];
-      tunnelStartAttempts = 0;
-      logger.info(`Cloudflare Tunnel ready at ${publicTunnelUrl}`);
-    }
-  });
-
-  cloudflaredProcess.stderr.on('data', (data) => {
-    const text = data.toString();
-    const match = text.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
-    if (match && match[0] !== publicTunnelUrl) {
-      publicTunnelUrl = match[0];
-      tunnelStartAttempts = 0;
-      logger.info(`Cloudflare Tunnel ready at ${publicTunnelUrl}`);
-    }
-  });
-
-  cloudflaredProcess.on('error', (error) => {
-    logger.error('Cloudflare Tunnel error:', error);
-    cloudflaredProcess = null;
-    publicTunnelUrl = '';
-  });
-
-  cloudflaredProcess.on('exit', (code, signal) => {
-    logger.warn('Cloudflare Tunnel exited with code', code, 'signal', signal);
-    cloudflaredProcess = null;
-    publicTunnelUrl = '';
-    // Reconexão automática com delay progressivo
-    const delay = Math.min(tunnelStartAttempts * 5000, 30000) || 5000;
-    logger.info(`Tentando reconectar o túnel em ${delay / 1000}s...`);
-    if (tunnelReconnectTimer) clearTimeout(tunnelReconnectTimer);
-    tunnelReconnectTimer = setTimeout(() => {
-      tunnelReconnectTimer = null;
-      startCloudflareTunnel();
-    }, delay);
-  });
-}
-
-function stopCloudflareTunnel() {
-  if (tunnelReconnectTimer) {
-    clearTimeout(tunnelReconnectTimer);
-    tunnelReconnectTimer = null;
-  }
-  if (cloudflaredProcess) {
-    cloudflaredProcess.kill('SIGTERM');
-    cloudflaredProcess = null;
-    publicTunnelUrl = '';
-  }
-}
-
-async function handleAlyLink(req, res) {
-  const alyBase = publicTunnelUrl || `http://localhost:${port}`;
-  const chatUrl = `${alyBase}/aly`;
-  const apiUrl = `${alyBase}/api/aly-chat`;
-  sendJson(res, 200, {
-    publicUrl: alyBase,
-    chatUrl,
-    apiUrl,
-    local: !publicTunnelUrl
-  });
-}
-
-async function handleAlyStatus(req, res) {
-  sendJson(res, 200, {
-    tunnelUp: Boolean(publicTunnelUrl),
-    publicUrl: publicTunnelUrl || null,
-    localUrl: `http://localhost:${port}`
-  });
+function isDiscordOnlyDeployment() {
+  return Boolean(process.env.RENDER);
 }
 
 async function handleAlyImage(req, res) {
@@ -316,24 +197,6 @@ async function handleAlyFile(req, res) {
   });
 }
 
-async function handleTunnelRestart(req, res) {
-  logger.info('Reiniciando Cloudflare Tunnel manualmente...');
-  stopCloudflareTunnel();
-  tunnelStartAttempts = 0;
-  if (process.env.DISABLE_TUNNEL !== 'true') startCloudflareTunnel();
-  // Aguarda até 15s para o novo link aparecer
-  let attempts = 0;
-  while (!publicTunnelUrl && attempts < 30) {
-    await new Promise(r => setTimeout(r, 500));
-    attempts++;
-  }
-  if (publicTunnelUrl) {
-    sendJson(res, 200, { success: true, publicUrl: publicTunnelUrl, chatUrl: `${publicTunnelUrl}/aly` });
-  } else {
-    sendJson(res, 200, { success: false, message: 'Túnel iniciando... tente copiar o link novamente em alguns segundos.' });
-  }
-}
-
 loadLocalEnv();
 
 const discordStorage = new FileStorage(path.join(__dirname, 'nova-data', 'discord'));
@@ -386,6 +249,15 @@ const server = http.createServer(async (req, res) => {
     }
     applySecurityHeaders(req, res, req.headers.origin);
 
+    const url = new URL(req.url, `http://${req.headers.host || 'localhost:3000'}`);
+
+    // No Render, a Sofia funciona somente como bot do Discord. A única rota
+    // pública mantida é o health check necessário para o serviço permanecer ativo.
+    if (isDiscordOnlyDeployment() && url.pathname !== '/health') {
+      sendText(res, 404, 'Página não disponível.');
+      return;
+    }
+
     // Resposta imediata 204 No Content para preflight OPTIONS do navegador
     if (req.method === 'OPTIONS') {
       res.statusCode = 204;
@@ -393,7 +265,6 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const url = new URL(req.url, `http://${req.headers.host || 'localhost:3000'}`);
     const publicRoutes = new Set([
       '/health',
       '/api/auth/status',
@@ -776,21 +647,6 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && url.pathname === '/aly') {
       serveAlyStatic(res);
-      return;
-    }
-
-    if (req.method === 'GET' && url.pathname === '/api/aly-link') {
-      await handleAlyLink(req, res);
-      return;
-    }
-
-    if (req.method === 'GET' && url.pathname === '/api/aly-status') {
-      await handleAlyStatus(req, res);
-      return;
-    }
-
-    if (req.method === 'POST' && url.pathname === '/api/tunnel-restart') {
-      await handleTunnelRestart(req, res);
       return;
     }
 
@@ -1198,7 +1054,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (url.pathname === '/' || url.pathname === '/index.html') {
+    if (url.pathname === '/' || url.pathname === '/index.html' || url.pathname === '/aly.html') {
       res.writeHead(302, { Location: '/aly', 'Cache-Control': 'no-store' });
       res.end();
       return;
@@ -1225,7 +1081,8 @@ async function startApplication() {
     logger.warn('Login bloqueado: configure SESSION_SECRET para liberar a Sofia.');
   }
   await discordManager.init().catch((error) => logger.error('Discord init error:', error));
-  server.listen(port, '0.0.0.0', async () => {
+  const listenHost = process.env.RENDER ? '0.0.0.0' : '127.0.0.1';
+  server.listen(port, listenHost, async () => {
   logger.info(`Assistente pronto em http://localhost:${port}`);
   notifications.createNotification({
     title: 'Servidor Sofia Inicializado',
@@ -1234,7 +1091,6 @@ async function startApplication() {
     priority: 'Média'
   });
   rotateBackups();
-  if (process.env.DISABLE_TUNNEL !== 'true') startCloudflareTunnel();
   await pluginManager.init().catch((err) => logger.error('PluginManager init error:', err));
 
   // Otimização automática de memória RAM (Limpeza a cada 15 min)
@@ -1269,13 +1125,11 @@ server.on('error', (error) => {
 });
 
 process.on('SIGINT', async () => {
-  stopCloudflareTunnel();
   await discordManager.stop();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  stopCloudflareTunnel();
   await discordManager.stop();
   process.exit(0);
 });
@@ -1355,9 +1209,6 @@ function isAdminRoute(pathname) {
     '/api/system-dashboard',
     '/api/system/model',
     '/api/computer/',
-    '/api/tunnel-restart',
-    '/api/aly-link',
-    '/api/aly-status',
     '/api/notifications',
     '/api/plugins',
     '/api/whatsapp/',

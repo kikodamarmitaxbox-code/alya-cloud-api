@@ -16,21 +16,6 @@ Write-Host '          Iniciando Sofia...'
 Write-Host '========================================'
 Write-Host ''
 
-$toolsDir = Join-Path $projectRoot 'tools'
-if (-not (Test-Path $toolsDir)) {
-  New-Item -ItemType Directory -Path $toolsDir | Out-Null
-}
-
-$cloudflaredPath = Join-Path $toolsDir 'cloudflared.exe'
-
-if (-not (Test-Path $cloudflaredPath)) {
-  Write-Host 'Baixando cloudflared...'
-  $url = 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe'
-  Invoke-WebRequest -Uri $url -OutFile $cloudflaredPath
-  Write-Host 'Download concluido.'
-  Write-Host ''
-}
-
 function Get-PortProcess {
   param([int]$Port)
   $connections = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue | Where-Object State -eq 'Listen'
@@ -57,6 +42,9 @@ if ($existingProcess) {
     if ($health.ok -and $health.name -eq 'Sofia') {
       Write-Host 'A Sofia ja esta ligada.' -ForegroundColor Green
       Write-Host "Servidor: $($existingProcess.ProcessName) (PID $($existingProcess.Id))"
+      Write-Host 'Chat privado: http://localhost:3000/aly' -ForegroundColor Cyan
+      Write-Host 'Code Sofia:   http://localhost:3000/code-alya' -ForegroundColor Cyan
+      Write-Host 'Discord:      ligado' -ForegroundColor Green
       Write-Host ''
       Start-Process 'http://localhost:3000/aly'
       Write-Host 'Esta janela ficara aberta ate voce fecha-la.'
@@ -118,13 +106,12 @@ Write-Host '========================================'
 Write-Host '🟢 Servidor iniciado com sucesso'
 Write-Host '========================================'
 Write-Host ''
-Write-Host 'Sofia disponivel em http://localhost:3000/aly'
-Write-Host ''
-
 $chatUrl = 'http://localhost:3000/aly'
-$publicChatUrl = 'https://alya-gnz7.onrender.com/aly'
-Write-Host 'Link publico permanente: ' -NoNewline
-Write-Host $publicChatUrl -ForegroundColor Cyan
+Write-Host 'Chat privado: ' -NoNewline
+Write-Host $chatUrl -ForegroundColor Cyan
+Write-Host 'Code Sofia:   ' -NoNewline
+Write-Host 'http://localhost:3000/code-alya' -ForegroundColor Cyan
+Write-Host 'Discord:      ligado' -ForegroundColor Green
 Write-Host ''
 Write-Host 'A Sofia continuara ligada ate voce fechar esta janela ou pressionar Ctrl+C.'
 Write-Host ''

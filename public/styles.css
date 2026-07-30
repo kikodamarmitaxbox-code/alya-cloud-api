@@ -653,8 +653,6 @@ html, body {
 .loading-sound-prompt { color: var(--text-tertiary); font-size: 0.85rem; cursor: pointer; }
 .users-list { display: flex; flex-direction: column; gap: 8px; }
 .whatsapp-empty { color: var(--text-tertiary); font-size: 0.88rem; }
-.public-link-banner { display: flex; align-items: center; gap: 10px; padding: 8px 16px; background: var(--bg-tertiary); border-bottom: 1px solid var(--border); font-size: 0.84rem; }
-.public-link-status { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; }
 .notification-bell-btn { position: relative; background: transparent; border: none; cursor: pointer; font-size: 1.1rem; padding: 4px; }
 .notification-badge { position: absolute; top: -4px; right: -4px; background: var(--accent); color: #fff; font-size: 0.65rem; font-weight: 700; padding: 1px 5px; border-radius: 99px; }
 .personality-select { padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem; outline: none; }
@@ -908,22 +906,6 @@ body.app-shell::after { width: 280px; height: 280px; right: 5%; top: 6%; backgro
 .share-btn:hover { color: white; background: rgba(155,138,251,.2); border-color: rgba(201,190,255,.48); }
 .header-avatar { position: relative; width: 33px; height: 33px; border-radius: 11px; display: grid; place-items: center; color: white; font-size: .76rem; font-weight: 700; }
 
-.public-link-banner {
-  position: relative;
-  width: auto;
-  margin: 8px 24px 0;
-  z-index: 25;
-  padding: 9px 13px;
-  border: 1px solid rgba(235,231,255,.12);
-  border-radius: 11px;
-  background: rgba(35,34,53,.92);
-  box-shadow: 0 16px 38px rgba(0,0,0,.28);
-  backdrop-filter: blur(18px);
-}
-.public-link-label { color: #cbc5df !important; font-size: .75rem; }
-.public-link-text { color: #bdb1ff !important; font-size: .73rem; }
-.public-link-copy, .public-link-restart { background: rgba(255,255,255,.08) !important; border-radius: 7px !important; font: 600 .7rem var(--font-sans) !important; }
-
 /* Welcome */
 .chat-area { min-height: 0; overflow: hidden; }
 .welcome:not([hidden]) ~ .messages { display: none; }
@@ -1117,7 +1099,6 @@ body.light-theme .composer-toolbar { border-top-color: rgba(82,63,133,.1); }
 body.light-theme .toolbar-btn { color: #6a6377; }
 body.light-theme .model-select-pill { color: #5d566d; background: rgba(82,63,133,.04); }
 body.light-theme .composer-disclaimer p { color: #817b8c; }
-body.light-theme .public-link-banner { background: rgba(255,255,255,.85); border-color: rgba(76,56,120,.16); box-shadow: 0 14px 28px rgba(66,47,111,.08); }
 body.light-theme .memory-card { background: #fff; }
 
 @media (max-width: 900px) {
@@ -1152,7 +1133,6 @@ body.light-theme .memory-card { background: #fff; }
 /* Link simples para celular: use /aly?mobile=1 */
 body.simple-mobile-link { background: #10101d; }
 body.simple-mobile-link .sidebar,
-body.simple-mobile-link .public-link-banner,
 body.simple-mobile-link .header-search-button,
 body.simple-mobile-link .share-btn,
 body.simple-mobile-link .theme-button,

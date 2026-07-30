@@ -1,4 +1,4 @@
-const CACHE_NAME = 'alya-shell-v7';
+const CACHE_NAME = 'sofia-private-shell-v8';
 const APP_SHELL = [
   '/aly',
   '/styles.css',

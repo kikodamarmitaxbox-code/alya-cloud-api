@@ -49,12 +49,13 @@ async function waitForServer(baseUrl, child) {
   throw new Error('O servidor não iniciou no tempo esperado.');
 }
 
-function startServer(port) {
+function startServer(port, extraEnvironment = {}) {
   const child = spawn(process.execPath, ['server.js'], {
     cwd: root,
     env: {
       ...process.env,
-      PORT: String(port)
+      PORT: String(port),
+      ...extraEnvironment
     },
     stdio: ['ignore', 'pipe', 'pipe']
   });
@@ -151,7 +152,29 @@ async function main() {
     const removedGameFile = await request(baseUrl, '/game.html');
     assert(removedGame.status === 404 && removedGameFile.status === 404, 'O jogo removido ainda está acessível.');
 
+    await stopServer(child);
+    child = null;
+
+    const cloudPort = port + 300;
+    const cloudBaseUrl = `http://127.0.0.1:${cloudPort}`;
+    child = startServer(cloudPort, {
+      RENDER: 'true',
+      DISCORD_CLOUD_ENABLED: 'false'
+    });
+    await waitForServer(cloudBaseUrl, child);
+
+    const cloudHealth = await request(cloudBaseUrl, '/health');
+    const cloudChat = await request(cloudBaseUrl, '/aly');
+    const cloudCode = await request(cloudBaseUrl, '/code-alya');
+    const cloudApi = await request(cloudBaseUrl, '/api/auth/status');
+    assert(cloudHealth.status === 200, 'O health check público do Render foi bloqueado.');
+    assert(
+      cloudChat.status === 404 && cloudCode.status === 404 && cloudApi.status === 404,
+      'Uma página ou API privada continua pública no Render.'
+    );
+
     process.stdout.write('Acesso sem login verificado: entrada automática, navegadores isolados e administração bloqueada.\n');
+    process.stdout.write('Render verificado: somente o health check está público; chat e Code Sofia estão fechados.\n');
   } finally {
     await stopServer(child);
     if (firstUsername) history.deleteConversationHistory(conversationId, firstUsername);

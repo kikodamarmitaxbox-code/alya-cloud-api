@@ -28,18 +28,12 @@ const helpButton = document.querySelector('#helpButton');
 const searchConversationsInput = document.querySelector('#searchConversationsInput');
 const newConversationButton = document.querySelector('#newConversationButton');
 const conversationsListSidebar = document.querySelector('#conversationsListSidebar');
-const publicLinkBanner = document.querySelector('#publicLinkBanner');
-const publicLinkStatus = document.querySelector('#publicLinkStatus');
-const publicLinkText = document.querySelector('#publicLinkText');
-const copyPublicLink = document.querySelector('#copyPublicLink');
-const restartTunnel = document.querySelector('#restartTunnel');
 const loadingScreen = document.querySelector('#loadingScreen');
 const loadingStatus = document.querySelector('#loadingStatus');
 const loadingBar = document.querySelector('#loadingBar');
 const composeIconButton = document.querySelector('#composeIconButton');
 const userProfileButton = document.querySelector('#userProfileButton');
 const searchButton = document.querySelector('#searchButton');
-const shareLinkButton = document.querySelector('#shareLinkButton');
 const mobileMenuButton = document.querySelector('.mobile-menu-button');
 const sidebar = document.querySelector('#sidebar');
 const conversationHeading = document.querySelector('.conversation-heading span:last-child');
@@ -196,7 +190,7 @@ function activateSession(user) {
   if (welcomeUserName) welcomeUserName.textContent = `${getUserName()}.`;
   if (settingsUserName) settingsUserName.value = getUserName();
   const isAdmin = currentSessionRole === 'admin';
-  [systemButton, codeAlyaButton, computerButton, publicLinkBanner].forEach((element) => {
+  [systemButton, codeAlyaButton, computerButton].forEach((element) => {
     if (element) element.hidden = !isAdmin;
   });
   if (logoutButton) logoutButton.hidden = isGuest;
@@ -1420,23 +1414,6 @@ if (mobileMenuButton) {
   mobileMenuButton.addEventListener('click', () => sidebar?.classList.toggle('open'));
 }
 
-if (shareLinkButton) {
-  shareLinkButton.addEventListener('click', async () => {
-    const url = publicLinkText?.textContent?.trim() || window.location.href;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: 'Sofia', text: 'Converse com a Sofia', url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        shareLinkButton.innerHTML = '<span>✓</span> Copiado';
-        setTimeout(() => { shareLinkButton.innerHTML = '<span>↗</span> Compartilhar'; }, 1800);
-      }
-    } catch {
-      // Cancelar o compartilhamento não precisa mostrar um erro.
-    }
-  });
-}
-
 function openSettings() {
   if (!settingsModal) return;
   const appSettings = loadAppSettings();
@@ -1576,10 +1553,6 @@ function init() {
       updateWelcomeVisibility();
       await refreshProviderStatus(false);
 
-      // Não bloquear a inicialização se o link/tunnel falhar
-      try { await Promise.race([loadPublicLink(), new Promise(r => setTimeout(r, 3000))]); } catch {}
-      try { await Promise.race([checkTunnelStatus(), new Promise(r => setTimeout(r, 3000))]); } catch {}
-
       showLoadingScreen('Sofia pronta para conversar.', 100);
       playStartupSound();
 
@@ -1587,47 +1560,12 @@ function init() {
         safeHideLoading();
       }, 1000);
 
-      setInterval(checkTunnelStatus, 5000);
       setInterval(() => refreshProviderStatus(true), 60000);
     } catch (error) {
       safeHideLoading();
       console.error('Erro na inicializacao:', error);
     }
   }, 1400);
-}
-
-async function loadPublicLink() {
-  const publicLinkBanner = document.querySelector('#publicLinkBanner');
-  const publicLinkText = document.querySelector('#publicLinkText');
-  const copyPublicLink = document.querySelector('#copyPublicLink');
-
-  if (!publicLinkBanner || !publicLinkText || !copyPublicLink) return;
-
-  try {
-    const response = await fetch(`${apiBase}/api/aly-link`);
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Erro ao carregar link publico.');
-
-    const url = data.chatUrl || (data.publicUrl ? `${data.publicUrl}/aly` : '');
-    if (!url) return;
-
-    publicLinkText.textContent = url;
-    publicLinkBanner.hidden = false;
-
-    copyPublicLink.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(url);
-        copyPublicLink.textContent = 'Copiado';
-        setTimeout(() => {
-          copyPublicLink.textContent = 'Copiar';
-        }, 2000);
-      } catch {
-        copyPublicLink.textContent = 'Erro';
-      }
-    });
-  } catch {
-    // silently ignore
-  }
 }
 
 function updateWelcomeVisibility() {
@@ -1764,56 +1702,6 @@ function testStartupSound() {
   } catch {
     // ignore
   }
-}
-
-async function checkTunnelStatus() {
-  if (!publicLinkBanner || !publicLinkStatus || !publicLinkText) return;
-
-  try {
-    const response = await fetch(`${apiBase}/api/aly-status`);
-    const data = await response.json();
-    if (!response.ok) throw new Error();
-
-    if (data.tunnelUp && data.publicUrl) {
-      publicLinkText.textContent = `${data.publicUrl}/aly`;
-      publicLinkBanner.hidden = false;
-      publicLinkStatus.classList.remove('disconnected');
-    } else {
-      publicLinkText.textContent = data.localUrl || '';
-      publicLinkBanner.hidden = false;
-      publicLinkStatus.classList.add('disconnected');
-    }
-  } catch {
-    publicLinkStatus.classList.add('disconnected');
-  }
-}
-
-async function restartTunnelServices() {
-  if (!restartTunnel) return;
-  restartTunnel.disabled = true;
-  restartTunnel.textContent = 'Reiniciando...';
-
-  try {
-    const response = await fetch(`${apiBase}/api/tunnel-restart`, { method: 'POST' });
-    const data = await response.json().catch(() => ({}));
-    if (data.success && data.chatUrl && publicLinkText) {
-      publicLinkText.textContent = data.chatUrl;
-      if (publicLinkBanner) publicLinkBanner.hidden = false;
-      if (publicLinkStatus) publicLinkStatus.classList.remove('disconnected');
-    }
-    await checkTunnelStatus();
-  } catch {
-    if (publicLinkStatus) publicLinkStatus.classList.add('disconnected');
-  } finally {
-    if (restartTunnel) {
-      restartTunnel.disabled = false;
-      restartTunnel.textContent = 'Reiniciar';
-    }
-  }
-}
-
-if (restartTunnel) {
-  restartTunnel.addEventListener('click', restartTunnelServices);
 }
 
 if (computerButton) computerButton.addEventListener('click', openComputerControl);
