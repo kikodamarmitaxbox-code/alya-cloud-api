@@ -47,6 +47,33 @@ async function main() {
   assert.strictEqual(discord.resolveScreenshotChannel('global'), '123456789012345678');
   assert.strictEqual(discord.resolveScreenshotChannel('desconhecido'), '');
 
+  const privateDiscord = new DiscordManager({
+    storage: { init: async () => {} },
+    enabled: false,
+    privateOwnerUsernames: 'pedrinn0198_'
+  });
+  const ownerDm = {
+    author: { id: '111', username: 'pedrinn0198_', bot: false },
+    guild: null,
+    channel: { id: 'dm-owner' }
+  };
+  const otherDm = {
+    author: { id: '222', username: 'outra_pessoa', bot: false },
+    guild: null,
+    channel: { id: 'dm-other' }
+  };
+  const guildMessage = {
+    author: ownerDm.author,
+    guild: { id: 'guild' },
+    channel: { id: 'canal' },
+    mentions: { has: () => false }
+  };
+  assert.strictEqual(privateDiscord._isAllowed(ownerDm), true);
+  assert.strictEqual(privateDiscord._isAllowed(otherDm), false);
+  assert.strictEqual(privateDiscord._shouldRespond(ownerDm, 'oi, tudo bem?'), true);
+  assert.strictEqual(privateDiscord._shouldRespond(guildMessage, 'oi, tudo bem?'), false);
+  assert.strictEqual(privateDiscord._shouldRespond(guildMessage, 'Alya, tudo bem?'), true);
+
   process.stdout.write('Ponte local verificada: aprovação, isolamento, segredo e destinos Discord seguros.\n');
 }
 
