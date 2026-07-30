@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Alya - Assistente IA</title>
-    <meta name="description" content="Alya - Assistente IA premium. Converse, estude, organize ideias e tenha ajuda no dia a dia." />
+    <title>Sofia - Assistente IA</title>
+    <meta name="description" content="Sofia - Assistente IA premium. Converse, estude, organize ideias e tenha ajuda no dia a dia." />
     <link rel="icon" href="data:," />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -20,7 +20,7 @@
       <div class="welcome-splash-inner">
         <span class="splash-logo" aria-hidden="true">✦</span>
         <h2 class="splash-title">Bem-vindo, Pedro!</h2>
-        <p class="splash-subtitle">Iniciando Alya...</p>
+        <p class="splash-subtitle">Iniciando Sofia...</p>
       </div>
     </div>
 
@@ -40,7 +40,7 @@
                 </linearGradient>
               </defs>
             </svg>
-            <h1>Alya</h1>
+            <h1>Sofia</h1>
           </div>
           <button id="composeIconButton" class="sidebar-new-btn" type="button" title="Nova conversa">📝</button>
         </div>
@@ -96,7 +96,7 @@
         <header class="main-header">
           <div class="header-groups">
             <button class="model-selector" type="button">
-              <span>Alya</span>
+              <span>Sofia</span>
               <span class="chevron">⌵</span>
             </button>
             <select id="personalitySelect" class="sr-only" title="Personalidade">
@@ -121,7 +121,7 @@
         </header>
 
         <!-- Mode Strip (hidden by CSS) -->
-        <section class="mode-strip" aria-label="Modos da Alya">
+        <section class="mode-strip" aria-label="Modos da Sofia">
           <button class="mode-button" type="button" data-mode="normal">Normal</button>
           <button class="mode-button" type="button" data-mode="estudo">Estudo</button>
           <button class="mode-button" type="button" data-mode="criativo">Criativo</button>
@@ -145,7 +145,7 @@
               </svg>
               <h2 class="welcome-title">Oi, <span>Pedro</span></h2>
               <p class="welcome-subtitle">Como posso te ajudar hoje?</p>
-              <p class="welcome-desc">Alya está pronta para ajudar você com qualquer coisa.</p>
+              <p class="welcome-desc">Sofia está pronta para ajudar você com qualquer coisa.</p>
               <div class="welcome-cards">
                 <button class="welcome-card" data-prompt="Criar uma imagem detalhada com IA">
                   <div class="welcome-card-icon">🖼️</div>
@@ -196,13 +196,13 @@
                 <button class="toolbar-btn" type="button" title="Raciocínio">💡 Raciocinar</button>
               </div>
               <div class="toolbar-right">
-                <div class="model-select-pill">Alya Pro <span>⌵</span></div>
+                <div class="model-select-pill">Sofia Pro <span>⌵</span></div>
                 <button id="sendButton" class="send-btn" type="submit" title="Enviar" aria-label="Enviar">↑</button>
               </div>
             </div>
           </form>
           <div class="composer-disclaimer">
-            <p>Alya pode cometer erros. Verifique informações importantes.</p>
+            <p>Sofia pode cometer erros. Verifique informações importantes.</p>
           </div>
         </section>
       </section>
@@ -280,7 +280,7 @@
       </div>
     </section>
 
-    <section id="memoryModal" class="memory-modal" aria-label="Memória da Alya" hidden>
+    <section id="memoryModal" class="memory-modal" aria-label="Memória da Sofia" hidden>
       <div class="memory-card">
         <header class="memory-header">
           <h2>Memória</h2>
@@ -312,7 +312,7 @@
                   <option value="pt-BR">Português</option><option value="en">English</option><option value="es">Español</option>
                 </select>
               </label>
-              <label class="setting-item" for="settingsAiName"><span>Nome da IA</span><input id="settingsAiName" type="text" value="Alya" /></label>
+              <label class="setting-item" for="settingsAiName"><span>Nome da IA</span><input id="settingsAiName" type="text" value="Sofia" /></label>
               <label class="setting-item" for="settingsUserName"><span>Nome do usuário</span><input id="settingsUserName" type="text" value="Pedro" /></label>
               <label class="setting-item" for="settingsWelcomeToggle"><span>Tela de boas-vindas</span><input id="settingsWelcomeToggle" type="checkbox" checked /></label>
               <label class="setting-item" for="settingsSoundToggle"><span>Som de inicialização</span><input id="settingsSoundToggle" type="checkbox" checked /></label>
@@ -331,7 +331,7 @@
           <h2>Aprovar arquivo</h2>
           <button id="cancelFileEditButton" class="icon-button" type="button" title="Cancelar">×</button>
         </header>
-        <p class="approval-copy">A Alya quer alterar apenas o arquivo seguro dela:</p>
+        <p class="approval-copy">A Sofia quer alterar apenas o arquivo seguro dela:</p>
         <code class="file-path">nova-data/profile.json</code>
         <pre id="filePreview" class="file-preview"></pre>
         <div class="memory-actions">
@@ -414,7 +414,7 @@
                 <div class="memory-actions"><button id="devSaveFileButton" class="tool-button primary" type="button" disabled>Salvar</button></div>
               </section>
               <section id="devTabConsole" class="dev-tab-pane" style="display:none">
-                <div class="dev-terminal-container"><pre id="devTerminalOutput" class="dev-terminal-output">Alya Console - Digite um comando...&#10;</pre></div>
+                <div class="dev-terminal-container"><pre id="devTerminalOutput" class="dev-terminal-output">Sofia Console - Digite um comando...&#10;</pre></div>
                 <form id="devConsoleForm" class="dev-console-form">
                   <input id="devConsoleInput" type="text" placeholder="Executar comando..." autocomplete="off" />
                   <button id="devConsoleSubmit" class="tool-button primary" type="submit">Executar</button>

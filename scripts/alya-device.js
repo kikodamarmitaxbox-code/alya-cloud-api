@@ -77,7 +77,7 @@ async function processTask(task) {
 async function main() {
   if (process.platform !== 'win32') throw new Error('A ponte de captura precisa rodar no computador Windows.');
   if (secret.length < 32) throw new Error('ALYA_DEVICE_SECRET precisa ter no mínimo 32 caracteres.');
-  process.stdout.write(`Ponte segura da Alya conectando em ${serverUrl} como ${deviceId}.\n`);
+  process.stdout.write(`Ponte segura da Sofia conectando em ${serverUrl} como ${deviceId}.\n`);
   process.stdout.write('Deixe esta janela aberta para receber pedidos de captura.\n');
 
   while (!stopped) {

@@ -157,7 +157,7 @@ function showAuthModal(message = '') {
 function setAuthScreenMode(mode) {
   authScreenMode = mode === 'register' ? 'register' : 'login';
   const registering = authScreenMode === 'register';
-  authTitle.textContent = registering ? 'Criar minha conta' : 'Entrar na Alya';
+  authTitle.textContent = registering ? 'Criar minha conta' : 'Entrar na Sofia';
   authDescription.textContent = registering
     ? 'Escolha seu usuário e crie uma senha segura.'
     : 'Entre com sua conta para continuar.';
@@ -249,7 +249,7 @@ async function submitAuthentication(event) {
     authModal.hidden = true;
     authPassword.value = '';
     authPasswordConfirmation.value = '';
-    showToast(registering ? 'Conta criada. Bem-vindo à Alya.' : 'Acesso liberado. Bem-vindo à Alya.', 'success');
+    showToast(registering ? 'Conta criada. Bem-vindo à Sofia.' : 'Acesso liberado. Bem-vindo à Sofia.', 'success');
     refreshProviderStatus(false);
   } catch (error) {
     authStatus.textContent = error.message || 'Usuário ou senha inválidos';
@@ -349,7 +349,7 @@ async function saveSystemModel() {
     }
     if (!response.ok || !data.ok) throw new Error(data.error || 'Não consegui mudar o modelo.');
     localStorage.setItem(scopedStorageKey(preferredProviderKey), provider);
-    systemModelStatus.textContent = `${providerLabels[provider] || provider} selecionado. Reabrindo a Alya...`;
+    systemModelStatus.textContent = `${providerLabels[provider] || provider} selecionado. Reabrindo a Sofia...`;
     setTimeout(() => window.location.reload(), 650);
   } catch (error) {
     systemModelStatus.textContent = error.message || 'Não consegui mudar o modelo.';
@@ -382,7 +382,7 @@ function openSystemDashboard() {
 
 async function installAlyaApp() {
   if (window.matchMedia('(display-mode: standalone)').matches) {
-    showToast('A Alya já está instalada neste aparelho.', 'success');
+    showToast('A Sofia já está instalada neste aparelho.', 'success');
     return;
   }
   if (!deferredInstallPrompt) {
@@ -407,7 +407,7 @@ async function refreshProviderStatus(notify = false) {
     if (modelStatusPill) {
       modelStatusPill.classList.toggle('provider-fallback', Boolean(status.switched));
       modelStatusPill.title = status.switched
-        ? `O modelo principal caiu. A Alya trocou automaticamente para ${label}.`
+        ? `O modelo principal caiu. A Sofia trocou automaticamente para ${label}.`
         : `${label} está pronto.`;
     }
 
@@ -415,7 +415,7 @@ async function refreshProviderStatus(notify = false) {
     if (notify && previousProviderSignature && signature !== previousProviderSignature) {
       showToast(
         status.switched
-          ? `O modelo principal ficou indisponível. A Alya mudou automaticamente para ${label}.`
+          ? `O modelo principal ficou indisponível. A Sofia mudou automaticamente para ${label}.`
           : `${label} voltou a funcionar como modelo principal.`,
         status.switched ? 'warning' : 'success'
       );
@@ -516,7 +516,7 @@ function setupVoiceInput() {
   voiceRecognition.onend = () => {
     voiceInputButton.classList.remove('listening');
     voiceInputButton.textContent = '🎙';
-    voiceInputButton.title = 'Falar com a Alya';
+    voiceInputButton.title = 'Falar com a Sofia';
   };
   voiceRecognition.onerror = () => {
     voiceInputButton.classList.remove('listening');
@@ -549,7 +549,7 @@ async function prepareComputerControl() {
     const data = await response.json().catch(() => ({}));
     if (!data.ok) throw new Error(data.message || data.error || 'Não foi possível preparar esta ação.');
     pendingComputerApproval = data.approvalId;
-    computerApprovalText.textContent = `Alya quer: ${data.label}. A aprovação expira em 60 segundos.`;
+    computerApprovalText.textContent = `Sofia quer: ${data.label}. A aprovação expira em 60 segundos.`;
     computerApproval.hidden = false;
     computerStatus.textContent = 'Nada foi feito ainda.';
   } catch (error) {
@@ -609,7 +609,7 @@ function appendMessage(role, content) {
 
   const label = document.createElement('span');
   label.className = 'message-label';
-  label.textContent = role === 'user' ? 'Voce' : 'Alya';
+  label.textContent = role === 'user' ? 'Voce' : 'Sofia';
 
   const text = document.createElement('div');
   text.className = 'message-content';
@@ -705,7 +705,7 @@ function appendComputerApproval(label, approvalId) {
   article.className = 'message assistant computer-message';
   const title = document.createElement('span');
   title.className = 'message-label';
-  title.textContent = 'Alya · computador seguro';
+  title.textContent = 'Sofia · computador seguro';
   const text = document.createElement('div');
   text.className = 'message-content';
   text.textContent = `Posso ${label.charAt(0).toLowerCase()}${label.slice(1)}. Você confirma?`;
@@ -1026,7 +1026,7 @@ function render() {
 
     const label = document.createElement('span');
     label.className = 'message-label';
-    label.textContent = message.role === 'user' ? 'Voce' : 'Alya';
+    label.textContent = message.role === 'user' ? 'Voce' : 'Sofia';
 
     const content = document.createElement('div');
     content.className = 'message-content';
@@ -1036,7 +1036,7 @@ function render() {
       const image = document.createElement('img');
       image.className = 'chat-generated-image';
       image.src = message.imageUrl;
-      image.alt = message.imagePrompt || 'Imagem criada pela Alya';
+      image.alt = message.imagePrompt || 'Imagem criada pela Sofia';
       image.referrerPolicy = 'no-referrer';
       image.addEventListener('error', () => {
         const error = document.createElement('p');
@@ -1073,7 +1073,7 @@ async function sendMessage(content) {
   appendMessage('user', attachmentForRequest ? `${visibleContent}\n📎 ${attachmentForRequest.name}` : visibleContent);
   messageInput.value = '';
   messageInput.style.height = 'auto';
-  // No celular, fecha o teclado para a resposta da Alya ficar visível.
+  // No celular, fecha o teclado para a resposta da Sofia ficar visível.
   if (isSimpleMobileLink) messageInput.blur();
   setBusy(true);
 
@@ -1136,7 +1136,7 @@ async function sendMessage(content) {
       article.className = 'message assistant';
       const label = document.createElement('span');
       label.className = 'message-label';
-      label.textContent = 'Alya';
+      label.textContent = 'Sofia';
       const contentEl = document.createElement('div');
       contentEl.className = 'message-content';
       contentEl.textContent = '';
@@ -1235,7 +1235,7 @@ async function generateImage() {
 
   generateImageButton.disabled = true;
   generateImageButton.textContent = 'Criando...';
-  imageStudioStatus.textContent = 'A Alya está criando sua imagem...';
+  imageStudioStatus.textContent = 'A Sofia está criando sua imagem...';
   imageStudioResult.hidden = true;
   imageStudioResult.replaceChildren();
 
@@ -1340,7 +1340,7 @@ window.addEventListener('beforeinstallprompt', (event) => {
 });
 window.addEventListener('appinstalled', () => {
   deferredInstallPrompt = null;
-  showToast('Alya instalada com sucesso.', 'success');
+  showToast('Sofia instalada com sucesso.', 'success');
 });
 
 if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
@@ -1393,7 +1393,7 @@ if (shareLinkButton) {
     const url = publicLinkText?.textContent?.trim() || window.location.href;
     try {
       if (navigator.share) {
-        await navigator.share({ title: 'Alya', text: 'Converse com a Alya', url });
+        await navigator.share({ title: 'Sofia', text: 'Converse com a Sofia', url });
       } else {
         await navigator.clipboard.writeText(url);
         shareLinkButton.innerHTML = '<span>✓</span> Copiado';
@@ -1409,7 +1409,7 @@ function openSettings() {
   if (!settingsModal) return;
   const appSettings = loadAppSettings();
   if (settingsLanguage) settingsLanguage.value = appSettings.language || 'pt-BR';
-  if (settingsAiName) settingsAiName.value = appSettings.aiName || 'Alya';
+  if (settingsAiName) settingsAiName.value = appSettings.aiName || 'Sofia';
   if (settingsUserName) settingsUserName.value = appSettings.userName || getUserName();
   if (settingsWelcomeToggle) settingsWelcomeToggle.checked = getWelcomeEnabled();
   if (settingsSoundToggle) settingsSoundToggle.checked = appSettings.soundEnabled !== false;
@@ -1448,7 +1448,7 @@ document.addEventListener('keydown', (event) => {
 });
 
 helpButton.addEventListener('click', () => {
-  alert('Alya Assistente\n\nRecursos:\n- Chat com IA\n- Memoria persistente\n- Multiplas conversas\n- Configuracoes\n\nUse os botoes na barra lateral para acessar as funcionalidades.');
+  alert('Sofia Assistente\n\nRecursos:\n- Chat com IA\n- Memoria persistente\n- Multiplas conversas\n- Configuracoes\n\nUse os botoes na barra lateral para acessar as funcionalidades.');
 });
 
 let isDarkTheme = true;
@@ -1469,6 +1469,10 @@ if (themeButton) themeButton.addEventListener('click', toggleTheme);
 function init() {
   setupVoiceInput();
   const appSettings = loadAppSettings();
+  if (String(appSettings.aiName || '').trim().toLowerCase() === 'alya') {
+    appSettings.aiName = 'Sofia';
+    saveAppSettings({ aiName: 'Sofia' });
+  }
   if (appSettings.theme === 'light') {
     isDarkTheme = false;
     applyTheme();
@@ -1527,7 +1531,7 @@ function init() {
   }, 400);
 
   setTimeout(() => {
-    showLoadingScreen('Bem-vindo à Alya', 80);
+    showLoadingScreen('Bem-vindo à Sofia', 80);
   }, 900);
 
   setTimeout(async () => {
@@ -1544,7 +1548,7 @@ function init() {
       try { await Promise.race([loadPublicLink(), new Promise(r => setTimeout(r, 3000))]); } catch {}
       try { await Promise.race([checkTunnelStatus(), new Promise(r => setTimeout(r, 3000))]); } catch {}
 
-      showLoadingScreen('Alya pronta para conversar.', 100);
+      showLoadingScreen('Sofia pronta para conversar.', 100);
       playStartupSound();
 
       setTimeout(() => {

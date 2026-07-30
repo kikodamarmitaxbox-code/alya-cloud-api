@@ -15,11 +15,11 @@ async function main() {
   await store.init();
 
   assert.strictEqual(
-    computerControl.screenshotDestination('Alya, tira uma print da tela e mande no global'),
+    computerControl.screenshotDestination('Sofia, tira uma print da tela e mande no global'),
     'global'
   );
   const proposal = computerControl.createProposal(
-    'Alya, tira uma print da minha tela e mande no global',
+    'Sofia, tira uma print da minha tela e mande no global',
     { screenshotOnly: true }
   );
   assert.strictEqual(proposal.ok, true);
@@ -74,7 +74,7 @@ async function main() {
   assert.strictEqual(discord._isAllowed(otherDm), false);
   assert.strictEqual(privateDiscord._shouldRespond(ownerDm, 'oi, tudo bem?'), true);
   assert.strictEqual(privateDiscord._shouldRespond(guildMessage, 'oi, tudo bem?'), false);
-  assert.strictEqual(privateDiscord._shouldRespond(guildMessage, 'Alya, tudo bem?'), true);
+  assert.strictEqual(privateDiscord._shouldRespond(guildMessage, 'Sofia, tudo bem?'), true);
 
   process.stdout.write('Ponte local verificada: aprovação, isolamento, segredo e destinos Discord seguros.\n');
 }

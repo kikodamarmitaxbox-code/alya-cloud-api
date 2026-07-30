@@ -7,8 +7,8 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Alya" />
-  <title>Alya Assistente</title>
+  <meta name="apple-mobile-web-app-title" content="Sofia" />
+  <title>Sofia Assistente</title>
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/images/alya-avatar.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -35,7 +35,7 @@
           <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" fill="url(#starGradAly)" />
           <defs><linearGradient id="starGradAly" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse"><stop stop-color="#7c6ef0" /><stop offset="1" stop-color="#5b8dee" /></linearGradient></defs>
         </svg>
-        <h1>Alya</h1>
+        <h1>Sofia</h1>
       </div>
       <button id="composeIconButton" class="sidebar-new-btn" type="button" title="Nova conversa" aria-label="Nova conversa">✦</button>
     </div>
@@ -55,7 +55,7 @@
         <div class="sidebar-nav-left"><span>◈</span> <span>Sistema</span></div>
       </button>
       <button id="codeAlyaButton" class="sidebar-nav-item" type="button">
-        <div class="sidebar-nav-left"><span>&lt;/&gt;</span> <span>Code Alya</span></div>
+        <div class="sidebar-nav-left"><span>&lt;/&gt;</span> <span>Code Sofia</span></div>
       </button>
       <button id="helpButton" class="sidebar-nav-item" type="button">
         <div class="sidebar-nav-left"><span>?</span> <span>Ajuda</span></div>
@@ -77,7 +77,7 @@
 
     <div class="sidebar-profile" id="userProfileButton">
       <div style="display:flex;align-items:center">
-        <div class="profile-avatar alya-avatar"><img src="images/alya-avatar.png" alt="Alya" /><div class="profile-online-dot"></div></div>
+        <div class="profile-avatar alya-avatar"><img src="images/alya-avatar.png" alt="Sofia" /><div class="profile-online-dot"></div></div>
         <div class="profile-info">
           <span class="profile-name">Pedro</span>
           <span class="profile-role">Conta Privada</span>
@@ -88,9 +88,9 @@
       <div class="sidebar-nav-left"><span>↪</span> <span>Sair</span></div>
     </button>
 
-    <div class="sidebar-pro-card" aria-label="Plano Alya Pro">
+    <div class="sidebar-pro-card" aria-label="Plano Sofia Pro">
       <div class="sidebar-pro-icon">✦</div>
-      <div><strong>Alya Pro</strong><span>Mais recursos para criar</span></div>
+      <div><strong>Sofia Pro</strong><span>Mais recursos para criar</span></div>
     </div>
   </aside>
 
@@ -107,7 +107,7 @@
     <div id="loadingScreen" class="loading-screen">
       <div class="loading-inner">
         <span class="brand-mark">✦</span>
-        <h1 class="loading-title">Alya Assistente</h1>
+        <h1 class="loading-title">Sofia Assistente</h1>
         <p id="loadingStatus" class="loading-status">Inicializando...</p>
         <div class="loading-bar"><div id="loadingBar" class="loading-bar-fill"></div></div>
         <p id="soundPrompt" class="loading-sound-prompt" hidden>🔊 Clique para ativar o som</p>
@@ -128,7 +128,7 @@
         <button id="themeButton" class="icon-btn theme-button" type="button" title="Alterar tema" aria-label="Alterar tema">☼</button>
         <button id="computerButton" class="share-btn" type="button" title="Controle seguro do computador">⌘ Computador</button>
         <button id="shareLinkButton" class="share-btn" type="button" title="Compartilhar"><span>↗</span> Compartilhar</button>
-        <div class="header-avatar alya-avatar" title="Alya"><img src="images/alya-avatar.png" alt="Alya" /><div class="profile-online-dot"></div></div>
+        <div class="header-avatar alya-avatar" title="Sofia"><img src="images/alya-avatar.png" alt="Sofia" /><div class="profile-online-dot"></div></div>
       </div>
     </header>
 
@@ -138,10 +138,10 @@
         <div class="welcome-inner">
           <div class="welcome-aura" aria-hidden="true"><span>✦</span><img class="welcome-alya-photo" src="images/alya-avatar.png" alt="" /></div>
           <p class="welcome-kicker">SEU ESPAÇO PARA CRIAR</p>
-          <p class="mobile-alya-name">Alya</p>
+          <p class="mobile-alya-name">Sofia</p>
           <h2 class="welcome-title">Oi, <span>Pedro.</span></h2>
           <p class="welcome-subtitle">Por onde começamos?</p>
-          <p class="welcome-desc">Ideias, textos, estudos e planos — Alya transforma o primeiro rascunho em algo especial.</p>
+          <p class="welcome-desc">Ideias, textos, estudos e planos — Sofia transforma o primeiro rascunho em algo especial.</p>
           <div class="mobile-quick-actions" aria-label="Atalhos rápidos">
             <button class="mobile-quick-action" type="button" data-prompt="Me dê dicas rápidas sobre:">💡 Dicas rápidas</button>
             <button class="mobile-quick-action" type="button" data-prompt="Crie um plano para:">🎯 Criar plano</button>
@@ -166,7 +166,7 @@
     <section class="composer-section">
       <form id="chatForm" class="composer">
         <label class="sr-only" for="messageInput">Mensagem</label>
-        <textarea id="messageInput" name="message" rows="1" placeholder="Pergunte à Alya qualquer coisa..."></textarea>
+        <textarea id="messageInput" name="message" rows="1" placeholder="Pergunte à Sofia qualquer coisa..."></textarea>
         <div id="attachmentChip" class="attachment-chip" hidden>
           <span id="attachmentName"></span>
           <button id="removeAttachmentButton" type="button" aria-label="Remover arquivo">×</button>
@@ -180,12 +180,12 @@
           </div>
           <div class="toolbar-right">
             <div id="modelStatusPill" class="model-select-pill" title="Situação do modelo"><i></i><span id="modelStatusText">Verificando IA</span></div>
-            <button id="voiceInputButton" class="voice-input-btn" type="button" title="Falar com a Alya" aria-label="Falar com a Alya">🎙</button>
+            <button id="voiceInputButton" class="voice-input-btn" type="button" title="Falar com a Sofia" aria-label="Falar com a Sofia">🎙</button>
             <button id="sendButton" class="send-btn" type="submit" title="Enviar" aria-label="Enviar">↑</button>
           </div>
         </div>
       </form>
-      <div class="composer-disclaimer"><p>Alya pode cometer erros. Verifique informações importantes.</p></div>
+      <div class="composer-disclaimer"><p>Sofia pode cometer erros. Verifique informações importantes.</p></div>
     </section>
   </section>
 
@@ -202,13 +202,13 @@
           <label class="setting-item" for="settingsLanguage"><span>Idioma</span>
             <select id="settingsLanguage" class="setting-select"><option value="pt-BR">Português</option><option value="en">English</option><option value="es">Español</option></select>
           </label>
-          <label class="setting-item" for="settingsAiName"><span>Nome da IA</span><input id="settingsAiName" type="text" value="Alya" /></label>
+          <label class="setting-item" for="settingsAiName"><span>Nome da IA</span><input id="settingsAiName" type="text" value="Sofia" /></label>
           <label class="setting-item" for="settingsUserName"><span>Nome do usuário</span><input id="settingsUserName" type="text" value="Pedro" /></label>
           <label class="setting-item" for="settingsWelcomeToggle"><span>Tela de boas-vindas</span><input id="settingsWelcomeToggle" type="checkbox" checked /></label>
           <label class="setting-item" for="settingsSoundToggle"><span>Som de inicialização</span><input id="settingsSoundToggle" type="checkbox" checked /></label>
           <label class="setting-item" for="settingsSoundVolume"><span>Volume do som</span><input id="settingsSoundVolume" type="range" min="0" max="100" value="50" /></label>
           <button id="testSoundButton" class="tool-button" type="button">Testar som</button>
-          <button id="installAppButton" class="tool-button primary" type="button">Instalar Alya no celular</button>
+          <button id="installAppButton" class="tool-button primary" type="button">Instalar Sofia no celular</button>
         </section>
         <section id="settingsChat" class="settings-tab" data-tab="chat" hidden>
           <h3>Chat</h3>
@@ -232,7 +232,7 @@
   <section id="systemModal" class="memory-modal" aria-label="Painel do sistema" hidden>
     <div class="memory-card system-card">
       <header class="memory-header">
-        <div><h2>Painel da Alya</h2><p>Funcionamento, proteção e consumo em tempo real.</p></div>
+        <div><h2>Painel da Sofia</h2><p>Funcionamento, proteção e consumo em tempo real.</p></div>
         <button id="closeSystemButton" class="icon-button" type="button" title="Fechar">×</button>
       </header>
       <div id="systemOverview" class="system-overview">
@@ -241,7 +241,7 @@
       <div class="system-model-control">
         <div>
           <strong>Modelo principal</strong>
-          <small>Se ele cair, a Alya ainda tenta os modelos de reserva.</small>
+          <small>Se ele cair, a Sofia ainda tenta os modelos de reserva.</small>
         </div>
         <div class="system-model-actions">
           <select id="systemModelSelect" aria-label="Escolher modelo principal"></select>
@@ -256,10 +256,10 @@
     </div>
   </section>
 
-  <section id="authModal" class="memory-modal auth-modal" aria-label="Entrar na Alya">
+  <section id="authModal" class="memory-modal auth-modal" aria-label="Entrar na Sofia">
     <form id="authForm" class="memory-card auth-card">
       <div class="auth-brand">✦</div>
-      <h2 id="authTitle">Entrar na Alya</h2>
+      <h2 id="authTitle">Entrar na Sofia</h2>
       <p id="authDescription">Entre com sua conta para continuar.</p>
       <label id="authUsernameLabel">Usuário<input id="authUsername" type="text" autocomplete="username" maxlength="32" required /></label>
       <label>Senha<input id="authPassword" type="password" autocomplete="current-password" minlength="5" required /></label>
@@ -273,7 +273,7 @@
   <section id="toolsModal" class="memory-modal" aria-label="Ferramentas profissionais" hidden>
     <div class="memory-card tools-card">
       <header class="memory-header">
-        <div><h2>Ferramentas profissionais</h2><p>Escolha uma opção e a Alya vai conduzir tudo pelo chat.</p></div>
+        <div><h2>Ferramentas profissionais</h2><p>Escolha uma opção e a Sofia vai conduzir tudo pelo chat.</p></div>
         <button id="closeToolsButton" class="icon-button" type="button" title="Fechar">×</button>
       </header>
       <div class="professional-tools-grid">
@@ -289,7 +289,7 @@
   <section id="imageStudioModal" class="memory-modal" aria-label="Criar imagem" hidden>
     <div class="memory-card image-studio-card">
       <header class="memory-header">
-        <div><h2>Estúdio de imagens</h2><p>Crie uma imagem bonita para a Alya ou seu Discord.</p></div>
+        <div><h2>Estúdio de imagens</h2><p>Crie uma imagem bonita para a Sofia ou seu Discord.</p></div>
         <button id="closeImageStudioButton" class="icon-button" type="button" title="Fechar">×</button>
       </header>
       <div class="image-studio-content">
@@ -318,9 +318,9 @@
 
   <section id="computerModal" class="memory-modal" aria-label="Controle seguro do computador" hidden>
     <div class="memory-card">
-      <header class="memory-header"><div><h2>Computador seguro</h2><p>Alya sempre pede sua aprovação antes de fazer algo.</p></div><button id="closeComputerButton" class="icon-button" type="button">×</button></header>
+      <header class="memory-header"><div><h2>Computador seguro</h2><p>Sofia sempre pede sua aprovação antes de fazer algo.</p></div><button id="closeComputerButton" class="icon-button" type="button">×</button></header>
       <div class="image-studio-content">
-        <label class="image-prompt-label" for="computerRequest">O que a Alya deve fazer?</label>
+        <label class="image-prompt-label" for="computerRequest">O que a Sofia deve fazer?</label>
         <textarea id="computerRequest" rows="3" maxlength="600" placeholder="Ex.: abra a calculadora, abra https://youtube.com ou crie um arquivo chamado ideias"></textarea>
         <button id="prepareComputerAction" class="tool-button primary" type="button">Preparar ação</button>
         <div id="computerApproval" hidden><p id="computerApprovalText" class="image-studio-status"></p><button id="approveComputerAction" class="tool-button primary" type="button">Sim, pode fazer</button></div>

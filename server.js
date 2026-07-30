@@ -1029,7 +1029,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // Rotas do Centro de Notificações Inteligentes (Exclusivo Alya Privada)
+    // Rotas do Centro de Notificações Inteligentes (Exclusivo Sofia Privada)
     if (req.method === 'GET' && url.pathname === '/api/notifications') {
       if (!requireAuth(req, res)) return;
       const data = notifications.getNotifications();
@@ -1238,14 +1238,14 @@ async function startApplication() {
   await persistentStore.init();
   await ensureBootstrapAdmin();
   if (!isGuestMode() && !String(process.env.SESSION_SECRET || '').trim()) {
-    logger.warn('Login bloqueado: configure SESSION_SECRET para liberar a Alya.');
+    logger.warn('Login bloqueado: configure SESSION_SECRET para liberar a Sofia.');
   }
   await discordManager.init().catch((error) => logger.error('Discord init error:', error));
   server.listen(port, '0.0.0.0', async () => {
   logger.info(`Assistente pronto em http://localhost:${port}`);
   notifications.createNotification({
-    title: 'Servidor Alya Inicializado',
-    message: `Servidor Alya v2.0.0 ativo em http://localhost:${port}. Pronta para uso!`,
+    title: 'Servidor Sofia Inicializado',
+    message: `Servidor Sofia v2.0.0 ativo em http://localhost:${port}. Pronta para uso!`,
     category: 'Sistema',
     priority: 'Média'
   });
@@ -1388,8 +1388,8 @@ async function sendCodeAgentResponse(res, operation) {
   } catch (error) {
     const message = error instanceof Error && error.message
       ? error.message
-      : 'A Code Alya não conseguiu concluir essa ação.';
-    logger.warn(`Code Alya: ${message}`);
+      : 'A Code Sofia não conseguiu concluir essa ação.';
+    logger.warn(`Code Sofia: ${message}`);
     sendJson(res, 400, { ok: false, error: message });
   }
 }
@@ -1418,8 +1418,8 @@ async function sendCodeAgentStream(res, operation) {
   } catch (error) {
     const message = error instanceof Error && error.message
       ? error.message
-      : 'A Code Alya não conseguiu concluir essa ação.';
-    logger.warn(`Code Alya: ${message}`);
+      : 'A Code Sofia não conseguiu concluir essa ação.';
+    logger.warn(`Code Sofia: ${message}`);
     sendEvent({ type: 'error', error: message });
   } finally {
     ended = true;
@@ -1549,7 +1549,7 @@ async function handleAlyChat(req, res) {
     }));
 
   if (safeMessages.length === 0) {
-    sendJson(res, 400, { error: 'Escreva uma mensagem para a Alya.' });
+    sendJson(res, 400, { error: 'Escreva uma mensagem para a Sofia.' });
     return;
   }
 
@@ -1566,7 +1566,7 @@ async function handleAlyChat(req, res) {
       memoryTurn.instruction ? `[INSTRUÇÃO DE MEMÓRIA]\n${memoryTurn.instruction}` : ''
     ].filter(Boolean).join('\n\n');
   } catch (error) {
-    logger.warn('Falha não crítica na memória da Alya:', error.message);
+    logger.warn('Falha não crítica na memória da Sofia:', error.message);
   }
 
   // Executar hook de plugins (ex: plugin de busca web)
@@ -1628,7 +1628,7 @@ async function handleAlyChatStream(req, res) {
     }));
 
   if (safeMessages.length === 0) {
-    sendJson(res, 400, { error: 'Escreva uma mensagem para a Alya.' });
+    sendJson(res, 400, { error: 'Escreva uma mensagem para a Sofia.' });
     return;
   }
 
@@ -1645,7 +1645,7 @@ async function handleAlyChatStream(req, res) {
       memoryTurn.instruction ? `[INSTRUÇÃO DE MEMÓRIA]\n${memoryTurn.instruction}` : ''
     ].filter(Boolean).join('\n\n');
   } catch (error) {
-    logger.warn('Falha não crítica na memória do stream da Alya:', error.message);
+    logger.warn('Falha não crítica na memória do stream da Sofia:', error.message);
   }
 
   // Executar hook de plugins
@@ -1692,7 +1692,7 @@ function serveAlyStatic(res) {
 async function handleHealthCheck(req, res) {
   sendJson(res, 200, {
     ok: true,
-    name: 'Alya',
+    name: 'Sofia',
     online: true
   });
 }

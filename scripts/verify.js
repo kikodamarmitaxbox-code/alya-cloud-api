@@ -35,7 +35,7 @@ function verifySyntax() {
   }
 }
 
-function verifyCodeAlyaInterface() {
+function verifyCodeSofiaInterface() {
   const html = fs.readFileSync(path.join(root, 'public', 'code-alya.html'), 'utf8');
   const client = fs.readFileSync(path.join(root, 'public', 'code-alya.js'), 'utf8');
   const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
@@ -43,7 +43,7 @@ function verifyCodeAlyaInterface() {
     .map((match) => match[1]);
   for (const id of new Set(referencedIds)) {
     if (!new RegExp(`id=["']${id}["']`).test(html)) {
-      throw new Error(`Elemento da Code Alya ausente na interface: #${id}`);
+      throw new Error(`Elemento da Code Sofia ausente na interface: #${id}`);
     }
   }
   if (
@@ -54,7 +54,7 @@ function verifyCodeAlyaInterface() {
     !server.includes("url.pathname === '/api/code-alya/apply-stream'") ||
     !server.includes("url.pathname === '/api/code-alya/command-stream'")
   ) {
-    throw new Error('O progresso em tempo real da Code Alya não está conectado.');
+    throw new Error('O progresso em tempo real da Code Sofia não está conectado.');
   }
 }
 
@@ -78,11 +78,11 @@ async function verifySafety() {
   } catch (error) {
     blocked = /protegido/i.test(error.message);
   }
-  if (!blocked) throw new Error('A Code Alya não bloqueou um arquivo secreto.');
+  if (!blocked) throw new Error('A Code Sofia não bloqueou um arquivo secreto.');
 
   const workspace = codeAgent.getWorkspaceStatus();
   if (!workspace.ok || !Array.isArray(workspace.files) || !workspace.files.includes('server.js')) {
-    throw new Error('A Code Alya não conseguiu ler o projeto.');
+    throw new Error('A Code Sofia não conseguiu ler o projeto.');
   }
   if (
     typeof codeAgent.parseModelPlan !== 'function' ||
@@ -94,19 +94,19 @@ async function verifySafety() {
     typeof codeAgent.diagnoseProject !== 'function' ||
     typeof codeAgent.continueCodeSession !== 'function'
   ) {
-    throw new Error('Um recurso profissional da Code Alya não está disponível.');
+    throw new Error('Um recurso profissional da Code Sofia não está disponível.');
   }
   if (!codeAgent.listProjects().some((project) => project.id === 'main')) {
-    throw new Error('O projeto principal da Code Alya não está disponível.');
+    throw new Error('O projeto principal da Code Sofia não está disponível.');
   }
   const recoveredPlan = codeAgent.parseModelPlan(
     'texto antes {"summary":"Plano recuperado","actions":[{"type":"done"}]} texto depois {inválido}'
   );
   if (recoveredPlan.summary !== 'Plano recuperado' || recoveredPlan.actions.length !== 1) {
-    throw new Error('A Code Alya não recuperou uma resposta com texto extra.');
+    throw new Error('A Code Sofia não recuperou uma resposta com texto extra.');
   }
 
-  const testProjectName = `Verificação Alya ${Date.now()}`;
+  const testProjectName = `Verificação Sofia ${Date.now()}`;
   const createdProject = codeAgent.createProject(testProjectName).project;
   const projectsRoot = path.resolve(root, 'projects');
   const testProjectRoot = path.resolve(projectsRoot, createdProject.id);
@@ -122,13 +122,13 @@ async function verifySafety() {
     const patchActions = codeAgent.normalizeModelActions([{
       type: 'patch',
       path: 'README.md',
-      find: 'Projeto criado pela Code Alya.',
-      replace: 'Projeto verificado pela Code Alya.'
+      find: 'Projeto criado pela Code Sofia.',
+      replace: 'Projeto verificado pela Code Sofia.'
     }], createdProject.id);
     if (
       patchActions.length !== 1 ||
       patchActions[0].type !== 'write' ||
-      !patchActions[0].content.includes('Projeto verificado pela Code Alya.')
+      !patchActions[0].content.includes('Projeto verificado pela Code Sofia.')
     ) {
       throw new Error('A edição econômica por trechos não foi preparada corretamente.');
     }
@@ -177,9 +177,9 @@ async function verifySafety() {
 
 (async () => {
   verifySyntax();
-  verifyCodeAlyaInterface();
+  verifyCodeSofiaInterface();
   await verifySafety();
-  console.log('Verificação concluída: Alya e Code Alya estão prontas para uso.');
+  console.log('Verificação concluída: Sofia e Code Sofia estão prontas para uso.');
 })().catch((error) => {
   console.error(`Verificação falhou: ${error.message}`);
   process.exitCode = 1;

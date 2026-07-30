@@ -100,7 +100,7 @@ async function api(url, options = {}) {
   });
   const data = await response.json().catch(() => ({}));
   if (response.status === 401) {
-    throw new Error('Entre na Alya primeiro para abrir a Code Alya.');
+    throw new Error('Entre na Sofia primeiro para abrir a Code Sofia.');
   }
   if (!response.ok || data.ok === false) throw new Error(data.error || 'Não foi possível concluir.');
   return data;
@@ -116,7 +116,7 @@ async function streamApi(url, options = {}, onProgress = () => {}) {
       ...(options.headers || {})
     }
   });
-  if (response.status === 401) throw new Error('Entre na Alya primeiro para abrir a Code Alya.');
+  if (response.status === 401) throw new Error('Entre na Sofia primeiro para abrir a Code Sofia.');
   if (!response.ok || !response.body) {
     const data = await response.json().catch(() => ({}));
     throw new Error(data.error || 'Não foi possível concluir.');
@@ -132,7 +132,7 @@ async function streamApi(url, options = {}, onProgress = () => {}) {
     const event = JSON.parse(dataLine.slice(5).trim());
     if (event.type === 'progress') onProgress(event.message, event.kind || 'progress');
     else if (event.type === 'result') result = event.data;
-    else if (event.type === 'error') throw new Error(event.error || 'A Code Alya encontrou um problema.');
+    else if (event.type === 'error') throw new Error(event.error || 'A Code Sofia encontrou um problema.');
   };
 
   while (true) {
@@ -144,7 +144,7 @@ async function streamApi(url, options = {}, onProgress = () => {}) {
     if (done) break;
   }
   if (buffer.trim()) processFrame(buffer);
-  if (!result) throw new Error('A Code Alya não recebeu o resultado completo.');
+  if (!result) throw new Error('A Code Sofia não recebeu o resultado completo.');
   return result;
 }
 
@@ -410,7 +410,7 @@ function addMessage(role, content, extraHtml = '') {
   article.className = role === 'user' ? 'message user-message' : 'message assistant-message';
   article.innerHTML = role === 'user'
     ? `<div class="message-content"><p>${escapeHtml(content)}</p></div>`
-    : `<div class="message-label">ALYA</div><div class="message-content"><p>${escapeHtml(content)}</p>${extraHtml}</div>`;
+    : `<div class="message-label">SOFIA</div><div class="message-content"><p>${escapeHtml(content)}</p>${extraHtml}</div>`;
   chatMessages.appendChild(article);
   chatMessages.scrollTop = chatMessages.scrollHeight;
   return article;
@@ -419,7 +419,7 @@ function addMessage(role, content, extraHtml = '') {
 function addThinking() {
   const article = document.createElement('article');
   article.className = 'message assistant-message thinking-message';
-  article.innerHTML = '<div class="message-label">ALYA</div><div class="message-content"><span class="thinking-dots"><i></i><i></i><i></i></span><span class="thinking-status">Analisando o projeto e preparando o código...</span></div>';
+  article.innerHTML = '<div class="message-label">SOFIA</div><div class="message-content"><span class="thinking-dots"><i></i><i></i><i></i></span><span class="thinking-status">Analisando o projeto e preparando o código...</span></div>';
   chatMessages.appendChild(article);
   chatMessages.scrollTop = chatMessages.scrollHeight;
   return article;
@@ -516,7 +516,7 @@ async function sendCodeRequest(message) {
     }, (message) => {
       clearTimeout(wakeTimer);
       updateThinking(thinking, message);
-      appendTerminal(`[Alya] ${message}`, 'terminal-system');
+      appendTerminal(`[Sofia] ${message}`, 'terminal-system');
     });
     clearTimeout(wakeTimer);
     thinking.remove();
@@ -543,7 +543,7 @@ async function applyPlan(event) {
     !window.confirm(
       hasImportantCommand
         ? 'Este plano instala pacotes ou envia alterações pelo Git. Revise os comandos acima e confirme para continuar.'
-        : 'Aplicar estas mudanças? A Code Alya criará um backup para você poder desfazer.'
+        : 'Aplicar estas mudanças? A Code Sofia criará um backup para você poder desfazer.'
     )
   ) return;
   button.disabled = true;
@@ -641,7 +641,7 @@ async function runSmartDiagnosis() {
 
 async function undoLastChange() {
   if (!state.lastActionId) return;
-  if (!window.confirm('Desfazer a última alteração feita pela Code Alya?')) return;
+  if (!window.confirm('Desfazer a última alteração feita pela Code Sofia?')) return;
   undoLastButton.disabled = true;
   try {
     const data = await api('/api/code-alya/undo', {

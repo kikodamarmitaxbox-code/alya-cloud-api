@@ -132,7 +132,7 @@ async function main() {
 
     const blockedAdmin = await request(baseUrl, '/api/code-alya/status', { cookie: firstStatus.cookie });
     const blockedComputer = await request(baseUrl, '/api/computer/status', { cookie: firstStatus.cookie });
-    assert(blockedAdmin.status === 403, 'Um visitante acessou a Code Alya administrativa.');
+    assert(blockedAdmin.status === 403, 'Um visitante acessou a Code Sofia administrativa.');
     assert(blockedComputer.status === 403, 'Um visitante acessou o controle do computador.');
 
     const login = await request(baseUrl, '/api/auth/login', {

@@ -1,6 +1,6 @@
 {
-  "name": "Alya Assistente",
-  "short_name": "Alya",
+  "name": "Sofia Assistente",
+  "short_name": "Sofia",
   "description": "Sua assistente inteligente para conversar, estudar, criar e planejar.",
   "start_url": "/aly?source=app",
   "scope": "/",

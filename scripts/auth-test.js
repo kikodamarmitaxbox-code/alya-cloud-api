@@ -200,7 +200,7 @@ async function main() {
     assert(friendUsers.status === 403, 'Uma conta comum acessou a gestão administrativa.');
     const adminCodePage = await request(baseUrl, '/code-alya.html', { cookie: adminLogin.cookie });
     const friendCodePage = await request(baseUrl, '/code-alya.html', { cookie: friendLogin.cookie });
-    assert(adminCodePage.status === 200, 'O administrador não acessou a Code Alya.');
+    assert(adminCodePage.status === 200, 'O administrador não acessou a Code Sofia.');
     assert(friendCodePage.status === 302, 'Uma conta comum abriu a página administrativa.');
 
     await request(baseUrl, '/api/history/save', {

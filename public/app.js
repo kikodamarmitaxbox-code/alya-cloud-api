@@ -228,7 +228,7 @@ if (history.length === 0) {
   history = [
     {
       role: "assistant",
-      content: "Oi, eu sou a Alya. Posso te ajudar com ideias, estudos, textos e organizacao."
+      content: "Oi, eu sou a Sofia. Posso te ajudar com ideias, estudos, textos e organizacao."
     }
   ];
 }
@@ -598,7 +598,7 @@ function render() {
 
     const label = document.createElement("span");
     label.className = "message-label";
-    label.textContent = message.role === "user" ? "Voce" : (loadAppSettings().aiName || "Alya");
+    label.textContent = message.role === "user" ? "Voce" : (loadAppSettings().aiName || "Sofia");
 
     const content = document.createElement("div");
     content.className = "message-content";
@@ -1024,7 +1024,7 @@ function prepareFileProfileEdit(assistantMessage) {
   try {
     const config = JSON.parse(match[1]);
     const profile = {
-      name: "Alya",
+      name: "Sofia",
       personality: settings.personality,
       memory: settings.memory
     };
@@ -1163,7 +1163,7 @@ function exportConversation() {
       break;
     case 'md':
       content = history.map((message) => {
-        const label = message.role === "user" ? "### Você" : "### " + (loadAppSettings().aiName || "Alya");
+        const label = message.role === "user" ? "### Você" : "### " + (loadAppSettings().aiName || "Sofia");
         return `${label}\n\n${message.content}\n\n---`;
       }).join('\n');
       mimeType = 'text/markdown';
@@ -1175,7 +1175,7 @@ function exportConversation() {
     case 'txt':
     default:
       content = history.map((message) => {
-        const label = message.role === "user" ? "Voce" : (loadAppSettings().aiName || "Alya");
+        const label = message.role === "user" ? "Voce" : (loadAppSettings().aiName || "Sofia");
         return `${label}: ${message.content}`;
       }).join('\n\n');
       mimeType = 'text/plain';
@@ -1200,7 +1200,7 @@ function exportToPDF(stamp) {
 
   let y = 20;
   doc.setFontSize(16);
-  doc.text('Conversa com ' + (loadAppSettings().aiName || 'Alya'), 20, y);
+  doc.text('Conversa com ' + (loadAppSettings().aiName || 'Sofia'), 20, y);
   y += 15;
 
   doc.setFontSize(12);
@@ -1210,7 +1210,7 @@ function exportToPDF(stamp) {
       y = 20;
     }
 
-    const label = message.role === "user" ? "Você:" : (loadAppSettings().aiName || "Alya") + ":";
+    const label = message.role === "user" ? "Você:" : (loadAppSettings().aiName || "Sofia") + ":";
     doc.setFont(undefined, 'bold');
     doc.text(label, 20, y);
     y += 7;
@@ -1303,7 +1303,7 @@ function openSettings() {
   if (!settingsModal) return;
   const appSettings = loadAppSettings();
   if (settingsLanguage) settingsLanguage.value = appSettings.language || "pt-BR";
-  if (settingsAiName) settingsAiName.value = appSettings.aiName || "Alya";
+  if (settingsAiName) settingsAiName.value = appSettings.aiName || "Sofia";
   if (settingsUserName) settingsUserName.value = appSettings.userName || getUserName();
   if (settingsWelcomeToggle) settingsWelcomeToggle.checked = getWelcomeEnabled();
   if (settingsSoundToggle) settingsSoundToggle.checked = appSettings.soundEnabled !== false;
@@ -1323,7 +1323,7 @@ function switchSettingsTab(tabId) {
 function applySettings() {
   const updates = {
     language: settingsLanguage?.value || "pt-BR",
-    aiName: settingsAiName?.value?.trim() || "Alya",
+    aiName: settingsAiName?.value?.trim() || "Sofia",
     userName: settingsUserName?.value?.trim() || "Pedro",
     welcomeEnabled: settingsWelcomeToggle?.checked ?? true,
     soundEnabled: settingsSoundToggle?.checked ?? true
@@ -1397,7 +1397,7 @@ searchInput.addEventListener("input", () => {
 
   searchResults.innerHTML = results.map((message, index) => `
     <div class="search-result">
-      <span class="search-role">${message.role === 'user' ? 'Você' : (loadAppSettings().aiName || 'Alya')}:</span>
+      <span class="search-role">${message.role === 'user' ? 'Você' : (loadAppSettings().aiName || 'Sofia')}:</span>
       <p class="search-content">${message.content.slice(0, 200)}${message.content.length > 200 ? '...' : ''}</p>
     </div>
   `).join('');
@@ -2012,7 +2012,7 @@ document.addEventListener("keydown", (event) => {
 helpButton = document.querySelector("#helpButton");
 if (helpButton) {
   helpButton.addEventListener("click", () => {
-    alert("Alya - Assistente IA\n\nRecursos:\n- Chat com IA\n- Memoria persistente\n- Modo Dev\n- Integracao WhatsApp\n- Integracao Discord\n- Exportacao de conversas\n\nUse os botoes no topo para acessar as funcionalidades.");
+    alert("Sofia - Assistente IA\n\nRecursos:\n- Chat com IA\n- Memoria persistente\n- Modo Dev\n- Integracao WhatsApp\n- Integracao Discord\n- Exportacao de conversas\n\nUse os botoes no topo para acessar as funcionalidades.");
   });
 }
 
@@ -2524,7 +2524,7 @@ async function initShareLink() {
 initShareLink();
 
 /* ══════════════════════════════════════════════════════════
-   SISTEMA DE NOTIFICAÇÕES EXCLUSIVO DA ALYA PRIVADA (FRONTEND)
+   SISTEMA DE NOTIFICAÇÕES EXCLUSIVO DA SOFIA PRIVADA (FRONTEND)
    ══════════════════════════════════════════════════════════ */
 
 const notificationBellBtn = document.getElementById('notificationBellButton');
@@ -2760,4 +2760,3 @@ function escapeNotif(text) {
 // Boot notification poller (every 10 seconds)
 fetchNotifications();
 setInterval(fetchNotifications, 10000);
-

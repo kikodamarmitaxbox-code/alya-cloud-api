@@ -4,7 +4,7 @@ const crypto = require('crypto');
 
 const secret = crypto.randomBytes(40).toString('base64url');
 
-process.stdout.write('Configuração segura da ponte local da Alya\n\n');
+process.stdout.write('Configuração segura da ponte local da Sofia\n\n');
 process.stdout.write('1. No Render, adicione:\n');
 process.stdout.write(`ALYA_DEVICE_SECRET=${secret}\n\n`);
 process.stdout.write('2. No arquivo .env deste computador, adicione o MESMO valor:\n');
