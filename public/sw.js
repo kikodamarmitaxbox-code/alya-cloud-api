@@ -1,4 +1,4 @@
-const CACHE_NAME = 'alya-shell-v6';
+const CACHE_NAME = 'alya-shell-v7';
 const APP_SHELL = [
   '/aly',
   '/styles.css',

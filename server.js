@@ -50,6 +50,7 @@ const deviceBridge = require('./lib/deviceBridge');
 const persistentStore = require('./lib/persistentStore');
 const metrics = require('./lib/metrics');
 const codeAgent = require('./lib/codeAgent');
+const { generateImage } = require('./lib/imageGeneration');
 
 const root = __dirname;
 const publicDir = path.join(root, 'public');
@@ -188,59 +189,42 @@ async function handleAlyImage(req, res) {
     throw new UserFacingError('Descreva a imagem que você quer criar.', 400);
   }
 
-  const formats = {
-    avatar: { width: 1024, height: 1024, label: 'foto de perfil quadrada, rosto bem enquadrado e destaque no centro' },
-    banner: { width: 1536, height: 768, label: 'banner horizontal, composição panorâmica e sem texto importante nas bordas' },
-    personagem: { width: 1024, height: 1365, label: 'personagem em retrato vertical, pose expressiva e composição elegante' }
-  };
-  const styles = {
-    anime: 'ilustração anime premium, linhas limpas, cores vibrantes, iluminação suave e acabamento profissional',
-    cinematico: 'arte cinematográfica, iluminação dramática, composição profissional, cores harmoniosas e muitos detalhes',
-    realista: 'fotografia realista de alta qualidade, textura natural, iluminação de estúdio e foco nítido',
-    '3d': 'arte 3D premium, materiais detalhados, iluminação de estúdio, profundidade e acabamento de jogo moderno'
-  };
-  const format = formats[imageType];
-  const fullPrompt = `${prompt}. Create a ${format.label}. ${styles[imageStyle]}. High quality, polished details, balanced composition, beautiful background, no watermark, no logo, no readable text. Appropriate for all ages.`;
-  const apiKey = process.env.POLLINATIONS_API_KEY;
-  if (!apiKey) {
-    throw new UserFacingError('O gerador de imagens ainda precisa da chave POLLINATIONS_API_KEY no Render.');
-  }
-
-  const model = process.env.POLLINATIONS_IMAGE_MODEL || 'flux';
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 90000);
-
   try {
-    const imageUrl = `https://gen.pollinations.ai/image/${encodeURIComponent(fullPrompt)}?width=${format.width}&height=${format.height}&model=${encodeURIComponent(model)}&nologo=true`;
-    const response = await fetch(imageUrl, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-      signal: controller.signal
+    const image = await generateImage({
+      prompt,
+      type: imageType,
+      style: imageStyle
+    }, {
+      userId: getCurrentUserId(req)
     });
-    if (!response.ok) {
-      throw new Error(`Gerador respondeu ${response.status}`);
+    const filename = `sofia-${Date.now()}.${image.extension}`;
+    const saved = userFiles.saveUserFile(
+      getCurrentUserId(req),
+      filename,
+      image.mime,
+      image.buffer
+    );
+    if (!saved.ok || !saved.file?.id) {
+      throw new Error('A imagem foi criada, mas não pôde ser salva.');
     }
-
-    const contentType = response.headers.get('content-type') || 'image/jpeg';
-    if (!contentType.startsWith('image/')) throw new Error('O gerador não devolveu uma imagem.');
-    const imageBuffer = Buffer.from(await response.arrayBuffer());
-    if (imageBuffer.length > 10 * 1024 * 1024) throw new Error('A imagem gerada ficou grande demais.');
 
     sendJson(res, 200, {
       ok: true,
-      imageUrl: `data:${contentType};base64,${imageBuffer.toString('base64')}`,
+      imageUrl: `/api/files/download?id=${encodeURIComponent(saved.file.id)}&inline=1`,
+      file: saved.file,
       imageType,
       imageStyle,
-      model
+      model: image.model
     });
   } catch (error) {
-    logger.warn('Image generation failed:', error.message);
+    logger.warn('Image generation failed:', {
+      code: error.code || 'IMAGE_UNKNOWN_ERROR',
+      message: error.message
+    });
     throw new UserFacingError(
-      error.name === 'AbortError'
-        ? 'A imagem demorou demais. Tente novamente.'
-        : 'O gerador de imagens está indisponível agora. Tente novamente em alguns minutos.'
+      error.message || 'O gerador de imagens está indisponível agora. Tente novamente em alguns minutos.',
+      error.statusCode || 502
     );
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
@@ -529,7 +513,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, {
         'Content-Type': file.mime || 'application/octet-stream',
         'Content-Length': file.buffer.length,
-        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+        'Content-Disposition': `${url.searchParams.get('inline') === '1' ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(file.name)}`,
         'Cache-Control': 'private, no-store'
       });
       res.end(file.buffer);

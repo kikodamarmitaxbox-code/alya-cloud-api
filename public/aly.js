@@ -621,14 +621,43 @@ function appendMessage(role, content) {
 }
 
 function getImageRequestFromChat(text) {
-  const cleaned = String(text || '').trim().replace(/^["'“”]+|["'“”]+$/g, '').trim();
-  const match = cleaned.match(/^(?:cria|crie|faz|faça|gera|gere|desenha|desenhe)\s+(?:uma?\s+)?(?:imagem|foto|avatar|banner|arte|desenho)\s*(?:de|do|da|com)?\s*(.+)$/i);
-  if (!match?.[1]?.trim()) return null;
+  const cleaned = String(text || '')
+    .trim()
+    .replace(/^["'“”]+|["'“”]+$/g, '')
+    .replace(/^(?:sofia|alya|alia)[,:\s-]*/i, '')
+    .replace(/^(?:por favor|pfv|por gentileza)[,:\s-]*/i, '')
+    .trim();
+  const command = /\b(?:cria|crie|criar|faz|faça|fazer|gera|gere|gerar|desenha|desenhe|desenhar|tira|tire|tirar|manda|mande|mandar|envia|envie|enviar|mostra|mostre|mostrar|produz|produza|produzir)\b/i;
+  const imageKind = /\b(?:imagem|imagens|foto|fotos|avatar|banner|arte|desenho|ilustração|ilustracao|pôster|poster|capa|papel de parede|wallpaper|logo|logotipo|ícone|icone|figurinha|meme|gráfico|grafico|infográfico|infografico|diagrama|mapa|card|thumbnail|miniatura|print)\b/i;
+  const negated = /\b(?:não|nao)\s+(?:cria|crie|criar|faz|faça|fazer|gera|gere|gerar|manda|mande|mandar|envia|envie|enviar)\b/i;
+  const howTo = /\b(?:como|onde)\s+(?:eu\s+)?(?:crio|criar|faço|faco|fazer|gero|gerar|mando|mandar)\b/i;
+  const realScreenshot = /\b(?:print|captura)\b[\s\S]{0,35}\b(?:minha|desta|essa|da minha|do meu)\s+(?:tela|área de trabalho|area de trabalho|computador|pc)\b/i;
+  if (
+    !cleaned ||
+    !command.test(cleaned) ||
+    !imageKind.test(cleaned) ||
+    negated.test(cleaned) ||
+    howTo.test(cleaned) ||
+    realScreenshot.test(cleaned)
+  ) return null;
 
-  const prompt = match[1].trim();
+  const prompt = cleaned
+    .replace(/^(?:eu\s+)?(?:quero|queria|gostaria)\s+(?:que\s+)?(?:você|voce|a sofia|a alya)?\s*/i, '')
+    .replace(/^(?:me\s+)?(?:cria|crie|faz|faça|gera|gere|desenha|desenhe|tira|tire|manda|mande|envia|envie|mostra|mostre|produz|produza)\s*/i, '')
+    .trim() || cleaned;
   const normalized = `${cleaned} ${prompt}`.toLowerCase();
-  const type = /banner|capa/.test(normalized) ? 'banner' : /avatar|perfil|foto/.test(normalized) ? 'avatar' : 'personagem';
-  const style = /anime|mangá|manga|luffy|one piece|naruto|dragon ball/.test(normalized) ? 'anime' : 'cinematico';
+  const type = /banner|capa|wallpaper|papel de parede|paisagem|panorâmica|panoramica/.test(normalized)
+    ? 'banner'
+    : /avatar|perfil|logo|logotipo|ícone|icone|figurinha|thumbnail|miniatura/.test(normalized)
+      ? 'avatar'
+      : 'personagem';
+  const style = /anime|mangá|manga|luffy|one piece|naruto|dragon ball/.test(normalized)
+    ? 'anime'
+    : /realista|realística|realistica|fotografia|foto real|fotorrealista/.test(normalized)
+      ? 'realista'
+      : /\b3d\b|render|pixar|jogo moderno/.test(normalized)
+        ? '3d'
+        : 'cinematico';
   return { prompt, type, style };
 }
 
@@ -649,7 +678,10 @@ async function createImageFromChat(request) {
     renderSidebarConversations();
     render();
   } catch (error) {
-    history.push({ role: 'assistant', content: 'Não consegui criar a imagem agora. Tente novamente daqui a pouco.' });
+    history.push({
+      role: 'assistant',
+      content: error.message || 'Não consegui criar a imagem agora. Tente novamente daqui a pouco.'
+    });
     saveConversationHistory(currentConversationId, history);
     renderSidebarConversations();
     render();

@@ -9,7 +9,7 @@
     "code": "node alya-code.js",
     "dispositivo": "node scripts/alya-device.js",
     "configurar-dispositivo": "node scripts/setup-device.js",
-    "test": "node scripts/verify.js && node scripts/intelligence-test.js && node scripts/device-test.js && node scripts/auth-test.js && node scripts/guest-test.js",
+    "test": "node scripts/verify.js && node scripts/intelligence-test.js && node scripts/image-test.js && node scripts/device-test.js && node scripts/auth-test.js && node scripts/guest-test.js",
     "verify": "node scripts/verify.js",
     "test:intelligence": "node scripts/intelligence-test.js",
     "test:auth": "node scripts/auth-test.js",
