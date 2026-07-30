@@ -10,6 +10,7 @@ process.env.DATABASE_URL = '';
 process.env.DISCORD_ENABLED = 'false';
 process.env.DISABLE_TUNNEL = 'true';
 process.env.NODE_ENV = 'test';
+process.env.ALLOW_LOCAL_ADMIN = 'false';
 
 const root = path.resolve(__dirname, '..');
 const history = require('../lib/history');

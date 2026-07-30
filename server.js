@@ -1310,7 +1310,7 @@ function requireAuth(req, res) {
 
 function requireAdmin(req, res) {
   const user = getAuthenticatedUser(req);
-  if (user?.role === 'admin') return true;
+  if (user?.role === 'admin' || isLocalOwnerRequest(req)) return true;
   sendJson(res, 403, { error: 'Acesso permitido somente ao administrador.' });
   return false;
 }
@@ -1327,10 +1327,18 @@ function requireAuthPage(req, res) {
 }
 
 function requireAdminPage(req, res) {
-  if (getAuthenticatedUser(req)?.role === 'admin') return true;
+  if (getAuthenticatedUser(req)?.role === 'admin' || isLocalOwnerRequest(req)) return true;
   res.writeHead(302, { Location: '/aly', 'Cache-Control': 'no-store' });
   res.end();
   return false;
+}
+
+function isLocalOwnerRequest(req) {
+  if (!isGuestMode() || process.env.RENDER) return false;
+  if (String(process.env.ALLOW_LOCAL_ADMIN || 'true').toLowerCase() !== 'true') return false;
+  if (String(req?.headers?.['x-forwarded-for'] || '').trim()) return false;
+  const address = String(req?.socket?.remoteAddress || '').toLowerCase();
+  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
 }
 
 function isAdminRoute(pathname) {
